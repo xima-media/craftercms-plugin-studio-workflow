@@ -13,7 +13,8 @@ import java.time.ZonedDateTime
 
 /**
  * Executes a configured publish/request-publish action when a package enters a workflow step.
- * On success, moves the package to the configured success step.
+ * On success, moves the package to the configured success step and runs any automated
+ * action configured on that step (and subsequent success steps, recursively).
  * On failure, reverts the package to the previous step and notifies the user.
  */
 class WorkflowStepActionService {
@@ -61,6 +62,11 @@ class WorkflowStepActionService {
         }
 
         def actionLabel = StepActionType.displayLabel(actionType)
+
+        if (StepActionType.isArchiveAction(actionType)) {
+            return executeArchiveAction(siteId, workflowPackageId, userId, username, pkg, step, previousStepId, actionLabel)
+        }
+
         def environments = PublishingEnvironmentSupport.resolvePublishingEnvironments(applicationContext, siteId)
         if (StepActionType.requiresStaging(actionType) && !environments.stagingEnabled) {
             return failAndRevert(
@@ -132,8 +138,42 @@ class WorkflowStepActionService {
             )
         }
 
-        packageService.movePackage(siteId, workflowPackageId, successStepId, 0, userId, username, false)
+        def moveResult = packageService.movePackage(
+            siteId, workflowPackageId, successStepId, 0, userId, username, true, true, true
+        )
+        if (moveResult.stepActionFailed || moveResult.moveBlocked) {
+            return [
+                stepActionFailed: true,
+                message           : (moveResult.stepActionMessage ?: moveResult.moveBlockedReason) as String,
+                reverted          : moveResult.reverted == true,
+                workflowStepId    : moveResult.workflowStepId
+            ]
+        }
         return [stepActionFailed: false, stepActionSucceeded: true]
+    }
+
+    private Map executeArchiveAction(String siteId, String workflowPackageId, Long userId, String username,
+                                     Map pkg, Map step, String previousStepId, String actionLabel) {
+        if ((pkg.status as String) == 'archived') {
+            return [stepActionFailed: false, stepActionSucceeded: true, archived: true]
+        }
+        try {
+            packageService.archivePackage(siteId, workflowPackageId, userId, username)
+            logger.info(
+                '[crafterwf] Archived package {} automatically in step "{}" (site={})',
+                workflowPackageId, step.name, siteId
+            )
+            return [stepActionFailed: false, stepActionSucceeded: true, archived: true]
+        } catch (Exception e) {
+            logger.warn(
+                '[crafterwf] Archive step action failed for package {} on step {}: {}',
+                workflowPackageId, step.name, e.message, e
+            )
+            return failAndRevert(
+                siteId, workflowPackageId, userId, username, previousStepId, pkg, step, actionLabel,
+                e.message ?: 'Archive package failed unexpectedly.'
+            )
+        }
     }
 
     private Map failAndRevert(String siteId, String workflowPackageId, Long userId, String username,

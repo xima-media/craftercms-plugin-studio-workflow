@@ -18,7 +18,7 @@
   "scripts": {
     "dist": "rollup --config rollup.config.js",
     "build": "tsc -p tsconfig.json",
-    "test:unit": "yarn exec tsx src/utils/attachmentUtils.test.ts && yarn exec tsx src/utils/contentEventUtils.test.ts",
+    "test:unit": "yarn exec tsx src/utils/attachmentUtils.test.ts && yarn exec tsx src/utils/contentEventUtils.test.ts && yarn exec tsx src/stepActions.test.ts && yarn exec tsx src/components/projectTools/workflowFlowEdges.test.ts",
     "watch": "rollup --config rollup.config.js -w"
   },
   "devDependencies": {

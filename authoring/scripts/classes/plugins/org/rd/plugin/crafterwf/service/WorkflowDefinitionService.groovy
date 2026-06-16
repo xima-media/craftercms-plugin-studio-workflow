@@ -166,8 +166,10 @@ class WorkflowDefinitionService {
             step.allowAddPackage = WorkflowDefinitionSupport.allowsAddPackage(step)
             step.position = (idx + 1) * 1000
             step.actionType = StepActionType.normalize(step.actionType) ?: StepActionType.NONE
-            if (step.actionType == StepActionType.NONE) {
+            if (step.actionType == StepActionType.NONE || step.actionType == StepActionType.ARCHIVE_PACKAGE) {
                 step.actionSuccessStepId = null
+                step.actionSuccessStepClientKey = null
+                step.remove('actionSuccessStepIndex')
             }
 
             keptIds << stepId
@@ -189,6 +191,7 @@ class WorkflowDefinitionService {
         }
 
         def flowLayout = resolveFlowLayout(workflowFields?.flowLayout, existing.flowLayout, clientKeyToStepId, savedStepIds)
+        def flowEdgeLayout = resolveFlowEdgeLayout(workflowFields?.flowEdgeLayout, existing.flowEdgeLayout, clientKeyToStepId, savedStepIds)
         def flowViewport = resolveFlowViewport(workflowFields?.flowViewport, existing.flowViewport)
 
         def removedIds = existingIds - keptIds
@@ -222,6 +225,7 @@ class WorkflowDefinitionService {
                 ? WorkflowDefinitionSupport.allowsUiBypass([allowUiBypass: workflowFields.allowUiBypass])
                 : WorkflowDefinitionSupport.allowsUiBypass(existing),
             flowLayout          : flowLayout,
+            flowEdgeLayout      : flowEdgeLayout,
             flowViewport        : flowViewport
         ]
         writeDefinition(siteId, workflowId, definition, 'Update workflow definition')
@@ -514,7 +518,7 @@ class WorkflowDefinitionService {
 
     static String resolveSuccessStepId(Map step, Map stepActions, Set keptIds,
                                                Map clientKeyToStepId, List savedStepIds) {
-        if (!stepActions.actionType) {
+        if (!stepActions.actionType || StepActionType.isArchiveAction(stepActions.actionType)) {
             return null
         }
         def successStepId = stepActions.actionSuccessStepId
@@ -579,6 +583,47 @@ class WorkflowDefinitionService {
             def y = value.y instanceof Number ? (value.y as Number).doubleValue() : null
             if (x != null && y != null) {
                 layout[stepId] = [x: x, y: y]
+            }
+        }
+        return layout
+    }
+
+    static Map resolveFlowEdgeLayout(def incomingLayout, def existingLayout, Map clientKeyToStepId, List savedStepIds) {
+        def source = incomingLayout instanceof Map ? incomingLayout : (existingLayout instanceof Map ? existingLayout : [:])
+        def layout = [:]
+        source.each { key, value ->
+            def edgeKey = key?.toString()?.trim()
+            if (!edgeKey || !(value instanceof Map)) {
+                return
+            }
+            def parts = edgeKey.split('::', 2)
+            if (parts.length != 2) {
+                return
+            }
+            def sourceId = parts[0]?.trim()
+            def targetId = parts[1]?.trim()
+            if (clientKeyToStepId[sourceId]) {
+                sourceId = String.valueOf(clientKeyToStepId[sourceId])
+            }
+            if (clientKeyToStepId[targetId]) {
+                targetId = String.valueOf(clientKeyToStepId[targetId])
+            }
+            if (!savedStepIds.contains(sourceId) || !savedStepIds.contains(targetId)) {
+                return
+            }
+            def offsetX = value.offsetX instanceof Number ? (value.offsetX as Number).doubleValue() : null
+            def offsetY = value.offsetY instanceof Number ? (value.offsetY as Number).doubleValue() : null
+            def curvature = value.curvature instanceof Number ? (value.curvature as Number).doubleValue() : null
+            def entry = [:]
+            if (offsetX != null && offsetY != null) {
+                entry.offsetX = offsetX
+                entry.offsetY = offsetY
+            }
+            if (curvature != null) {
+                entry.curvature = Math.max(0.05d, Math.min(0.9d, curvature))
+            }
+            if (!entry.isEmpty()) {
+                layout["${sourceId}::${targetId}"] = entry
             }
         }
         return layout

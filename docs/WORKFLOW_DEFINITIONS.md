@@ -62,8 +62,8 @@ Each step object:
 | `color` | string | no | Column color token (default `blue`) |
 | `isTerminal` | boolean | no | Marks a “done” column |
 | `allowAddPackage` | boolean | no | Whether new packages can be created in this step |
-| `actionType` | string | no | Publish action: `none`, `request_publish_staging`, `request_publish_live`, `publish_staging`, `publish_live` |
-| `actionSuccessStepId` | string | no | Step to move package to after a successful action |
+| `actionType` | string | no | Automated action: `none`, `request_publish_staging`, `request_publish_live`, `publish_staging`, `publish_live`, `archive_package` |
+| `actionSuccessStepId` | string | no | **Publish actions only** — step to move the package to after a successful publish/request action (ignored for `archive_package`) |
 | `roleRule` | object | no | Who may move packages into this step (`mode`: `all` \| `include` \| `exclude`, `roles`: string[]) |
 | `contentRule` | object | no | Content constraints (`mode`: `all` \| `any`, `pathPatterns`, `contentTypes`) |
 | `transitionStepIds` | string[] | no | Step ids a package may be **manually dragged to** from this step on the board (see [Manual move transitions](#manual-move-transitions)) |
@@ -134,30 +134,33 @@ Example (abbreviated):
 }
 ```
 
-## Step publish actions
+## Step automated actions
 
-Steps may set `actionType` and optional `actionSuccessStepId`. When a package is **moved into** that step, `WorkflowStepActionService` runs the action against all **content attachments** on the package.
+Steps may set `actionType` and optional `actionSuccessStepId` (publish actions only). When a package is **moved into** that step, `WorkflowStepActionService` runs the configured action.
 
-**Important:** Actions delegate to Crafter Studio’s `workflowService` and run **as the user who moved the package**. They are not a custom publish path — permissions, validation, environment targets, and notifications behave **exactly as in stock Studio** (request-publish vs direct publish, staging vs live, etc.). See [FUNCTIONAL_SPEC.md § Publishing](./FUNCTIONAL_SPEC.md#publishing-and-crafter-studio-workflow).
+**Publish actions** delegate to Crafter Studio’s `workflowService` and run **as the user who moved the package**. They are not a custom publish path — permissions, validation, environment targets, and notifications behave **exactly as in stock Studio** (request-publish vs direct publish, staging vs live, etc.). See [FUNCTIONAL_SPEC.md § Publishing](./FUNCTIONAL_SPEC.md#publishing-and-crafter-studio-workflow).
 
 | `actionType` | When it runs | On success |
 |--------------|--------------|------------|
 | `none` | — | Package stays in entered step |
 | `request_publish_staging` / `request_publish_live` | After move into step | Optional move to `actionSuccessStepId` |
 | `publish_staging` / `publish_live` | After move into step | Optional move to `actionSuccessStepId` |
+| `archive_package` | After move into step | Package archived — removed from board; not in workflow (no success step) |
 
-On failure (no attachments, staging disabled, publish error), the package may revert to the previous step and the user sees the Studio error message. An audit entry records `package_step_action`.
+On publish-action failure (no attachments, staging disabled, publish error), the package may revert to the previous step and the user sees the Studio error message. An audit entry records `package_step_action`.
+
+**Archive action:** calls the same `WorkflowPackageService.archivePackage` path as the card menu **Archive Package** action, recording `package_modified` with note `Archived package "{title}"`. The package leaves the board and is **no longer in the workflow** — there is no success step and no follow-up move. Archive steps do **not** count as publish/review steps for the [workflow bypass guard](./WORKFLOW_BYPASS_GUARD.md).
 
 **Server logs (`[crafterwf]`):**
 
 | Log | Meaning |
 |-----|---------|
-| `Invoking Studio workflowService.requestPublish` / `publish` | Step action started (lists target env, path count, package id) |
-| `Step action … completed … Crafter Studio OOTB may queue publish/review emails via EmailMessageSender` | Action succeeded; OOTB review mail is **not** plugin mail |
-| `Step action … succeeded … but no success step is configured` | `actionSuccessStepId` empty — package stays on the action step |
-| `Step action … failed` | Publish/request failed; package may revert |
+| `Invoking Studio workflowService.requestPublish` / `publish` | Publish step action started |
+| `Archived package … automatically in step` | Archive step action succeeded |
+| `Step action … completed … Crafter Studio OOTB may queue publish/review emails` | Publish action succeeded |
+| `Step action … failed` | Action failed; package may revert |
 
-Configure step actions in **Project Tools → Workflows → Edit workflow →** per-step **Publish action** and optional **Success step** (workflow editor).
+Configure actions in **Project Tools → Workflows → Edit workflow →** per-step **Publish action**, **Archive package**, or optional **Success step** (publish only).
 
 ## Workflow flow editor
 

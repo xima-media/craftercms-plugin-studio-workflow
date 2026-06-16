@@ -34,6 +34,17 @@ export interface WorkflowFlowNodePosition {
 /** Canvas positions keyed by step id (persisted in workflow JSON). */
 export type WorkflowFlowLayout = Record<string, WorkflowFlowNodePosition>;
 
+/** Curve shape overrides for manual Move edges, keyed by "sourceId::targetId". */
+export interface WorkflowFlowEdgePath {
+  /** Offset of the curve midpoint from the straight line between endpoints (flow coords). */
+  offsetX?: number;
+  offsetY?: number;
+  /** Legacy scalar curvature; migrated to offsetX/offsetY when the edge is edited. */
+  curvature?: number;
+}
+
+export type WorkflowFlowEdgeLayout = Record<string, WorkflowFlowEdgePath>;
+
 /** React Flow pan/zoom state (persisted in workflow JSON). */
 export interface WorkflowFlowViewport {
   x: number;
@@ -104,6 +115,8 @@ export interface WorkflowDetail {
     allowUiBypass?: boolean;
     /** React Flow node positions keyed by step id. */
     flowLayout?: WorkflowFlowLayout;
+    /** Saved bezier curvature for Move transition edges keyed by "sourceStepId::targetStepId". */
+    flowEdgeLayout?: WorkflowFlowEdgeLayout;
     /** Saved canvas pan/zoom for the workflow flow editor. */
     flowViewport?: WorkflowFlowViewport | null;
   };

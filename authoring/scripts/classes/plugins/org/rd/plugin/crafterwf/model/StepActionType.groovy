@@ -7,13 +7,15 @@ class StepActionType {
     static final String REQUEST_PUBLISH_LIVE = 'request_publish_live'
     static final String PUBLISH_STAGING = 'publish_staging'
     static final String PUBLISH_LIVE = 'publish_live'
+    static final String ARCHIVE_PACKAGE = 'archive_package'
 
     private static final Set<String> ALL = [
         NONE,
         REQUEST_PUBLISH_STAGING,
         REQUEST_PUBLISH_LIVE,
         PUBLISH_STAGING,
-        PUBLISH_LIVE
+        PUBLISH_LIVE,
+        ARCHIVE_PACKAGE
     ] as Set
 
     static String normalize(def value) {
@@ -53,6 +55,15 @@ class StepActionType {
         return normalize(actionType) != null
     }
 
+    static boolean isPublishAction(String actionType) {
+        def type = normalize(actionType)
+        return type != null && type != ARCHIVE_PACKAGE
+    }
+
+    static boolean isArchiveAction(String actionType) {
+        return normalize(actionType) == ARCHIVE_PACKAGE
+    }
+
     static boolean requiresStaging(String actionType) {
         return actionType == REQUEST_PUBLISH_STAGING || actionType == PUBLISH_STAGING
     }
@@ -63,6 +74,7 @@ class StepActionType {
             case REQUEST_PUBLISH_LIVE: return 'Request publish to live'
             case PUBLISH_STAGING: return 'Publish to staging'
             case PUBLISH_LIVE: return 'Publish to live'
+            case ARCHIVE_PACKAGE: return 'Archive package'
             default: return actionType ?: 'Step action'
         }
     }

@@ -137,12 +137,13 @@ class WorkflowPackageService {
     }
 
     Map movePackage(String siteId, String workflowPackageId, String workflowStepId, int index, Long userId,
-                    String username, boolean executeStepActions = true, boolean recordAudit = true) {
+                    String username, boolean executeStepActions = true, boolean recordAudit = true,
+                    boolean skipTransitionCheck = false) {
         def pkg = requirePackage(siteId, workflowPackageId)
         def previousStepId = pkg.workflow_step_id as String
         def workflowId = pkg.workflow_id as String
         def step = definitionService.findStep(siteId, workflowId, workflowStepId)
-        if (previousStepId != workflowStepId) {
+        if (previousStepId != workflowStepId && !skipTransitionCheck) {
             def definition = definitionService.loadDefinition(siteId, workflowId)
             def fromStep = WorkflowDefinitionSupport.stepLookup(definition)[previousStepId]
             def allowedTargets = fromStep?.transitionStepIds
@@ -154,7 +155,7 @@ class WorkflowPackageService {
                 ])
             }
         }
-        if (previousStepId != workflowStepId && stepRuleService) {
+        if (previousStepId != workflowStepId && stepRuleService && !skipTransitionCheck) {
             def ruleCheck = stepRuleService.validateMoveToStep(siteId, step, workflowPackageId, username)
             if (!ruleCheck.allowed) {
                 return toMoveBlockedDto(pkg, ruleCheck)
@@ -195,9 +196,22 @@ class WorkflowPackageService {
         return [stepActionFailed: false]
     }
 
-    void archivePackage(String siteId, String workflowPackageId, Long userId) {
-        requirePackage(siteId, workflowPackageId)
+    void archivePackage(String siteId, String workflowPackageId, Long userId, String username = null) {
+        def pkg = requirePackage(siteId, workflowPackageId)
+        if ((pkg.status as String) == 'archived') {
+            return
+        }
+        def title = pkg.title as String
         packageDao.archive(siteId, workflowPackageId, userId)
+        auditLogService.record(
+            siteId,
+            userId,
+            username ?: 'system',
+            AuditOperation.PACKAGE_MODIFIED,
+            AuditTargetType.PACKAGE,
+            workflowPackageId,
+            "Archived package \"${title}\""
+        )
     }
 
     Map updatePackageTitle(String siteId, String workflowPackageId, String title, Long userId, String username) {

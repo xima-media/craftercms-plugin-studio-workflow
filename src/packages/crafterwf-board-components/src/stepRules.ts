@@ -131,3 +131,16 @@ export function evaluateStepMove(
   }
   return evaluateContentRule(contentRule, contentPaths, contentTypes);
 }
+
+export function hasConfiguredRoleRule(rule?: StepRoleRule): boolean {
+  const normalized = rule ?? defaultRoleRule();
+  return normalized.mode !== 'all' && normalized.roles.length > 0;
+}
+
+export function hasConfiguredContentRule(rule?: StepContentRule): boolean {
+  const normalized = rule ?? defaultContentRule();
+  return (
+    normalized.mode === 'any' &&
+    (normalized.pathPatterns.length > 0 || normalized.contentTypes.length > 0)
+  );
+}

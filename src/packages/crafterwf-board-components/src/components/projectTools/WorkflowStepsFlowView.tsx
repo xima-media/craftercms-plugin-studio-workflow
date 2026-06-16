@@ -2,15 +2,18 @@ import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Background,
+  ConnectionLineType,
   ConnectionMode,
-  MarkerType,
+  PanOnScrollMode,
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  applyEdgeChanges,
   applyNodeChanges,
   useReactFlow,
   type Connection,
   type Edge,
+  type EdgeTypes,
   type Node,
   type NodeTypes,
   type OnEdgesChange,
@@ -20,25 +23,37 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import useActiveSiteId from '@craftercms/studio-ui/hooks/useActiveSiteId';
 import { Box, Button, FormControlLabel, Stack, Switch, Tooltip, Typography, useTheme } from '@mui/material';
 
-import type { WorkflowFlowLayout, WorkflowFlowViewport, WorkflowStepDto } from '../../api/adminApi';
+import type { WorkflowFlowEdgeLayout, WorkflowFlowLayout, WorkflowFlowViewport, WorkflowStepDto } from '../../api/adminApi';
 import { DEFAULT_FLOW_VIEWPORT } from '../../api/adminApi';
-import { getStepActionLabel, hasPublishStepAction, SUCCESS_STEP_NONE } from '../../stepActions';
+import { getStepActionLabel, getStepActionDescriptions, hasStepAction, hasPublishStepAction, isArchiveStepAction, SUCCESS_STEP_NONE } from '../../stepActions';
+import { hasConfiguredContentRule, hasConfiguredRoleRule } from '../../stepRules';
 import WorkflowStepFlowNode, {
   WORKFLOW_STEP_NODE_HEIGHT,
   WORKFLOW_STEP_NODE_WIDTH,
   WorkflowStepFlowNodeData
 } from './WorkflowStepFlowNode';
 import { useReactFlowStyles } from './useReactFlowStyles';
+import WorkflowMoveEdge, { WorkflowMoveEdgeContext } from './WorkflowMoveEdge';
+import {
+  flowEdgeKey,
+  parseTransitionEdgeId,
+  resolveStoredEdgePath,
+  transitionEdgeId,
+  WORKFLOW_EDGE_INTERACTION_WIDTH,
+  WORKFLOW_EDGE_MARKER
+} from './workflowFlowEdges';
 
 export type FlowEditorStep = WorkflowStepDto & { clientKey: string };
 
 export interface WorkflowStepsFlowViewProps {
   steps: FlowEditorStep[];
   flowLayout: WorkflowFlowLayout;
+  flowEdgeLayout: WorkflowFlowEdgeLayout;
   initialFlowViewport?: WorkflowFlowViewport | null;
   selectedClientKey: string | null;
   onSelectStep(clientKey: string): void;
   onFlowLayoutChange(layout: WorkflowFlowLayout): void;
+  onFlowEdgeLayoutChange(layout: WorkflowFlowEdgeLayout): void;
   onFlowViewportChange?(viewport: WorkflowFlowViewport): void;
   onTransitionChange(sourceClientKey: string, targetClientKeys: string[]): void;
   onAddStep(): void;
@@ -48,29 +63,12 @@ const NODE_TYPES = {
   workflowStep: WorkflowStepFlowNode
 } as NodeTypes;
 
+const EDGE_TYPES = {
+  workflowMove: WorkflowMoveEdge
+} as EdgeTypes;
+
 const NODE_GAP_X = 24;
 const DEFAULT_ORIGIN = { x: 32, y: 48 };
-
-const TRANSITION_EDGE_PREFIX = 'transition::';
-
-function transitionEdgeId(sourceKey: string, targetKey: string): string {
-  return `${TRANSITION_EDGE_PREFIX}${sourceKey}::${targetKey}`;
-}
-
-function parseTransitionEdgeId(edgeId: string): { sourceKey: string; targetKey: string } | null {
-  if (!edgeId.startsWith(TRANSITION_EDGE_PREFIX)) {
-    return null;
-  }
-  const body = edgeId.slice(TRANSITION_EDGE_PREFIX.length);
-  const splitAt = body.indexOf('::');
-  if (splitAt <= 0) {
-    return null;
-  }
-  return {
-    sourceKey: body.slice(0, splitAt),
-    targetKey: body.slice(splitAt + 2)
-  };
-}
 
 export function buildDefaultRowLayout(steps: FlowEditorStep[]): WorkflowFlowLayout {
   const layout: WorkflowFlowLayout = {};
@@ -80,10 +78,30 @@ export function buildDefaultRowLayout(steps: FlowEditorStep[]): WorkflowFlowLayo
   return layout;
 }
 
-function defaultPosition(index: number): { x: number; y: number } {
+export function defaultPosition(index: number): { x: number; y: number } {
   return {
     x: DEFAULT_ORIGIN.x + index * (WORKFLOW_STEP_NODE_WIDTH + NODE_GAP_X),
     y: DEFAULT_ORIGIN.y
+  };
+}
+
+/** Canvas position for a newly added step without moving existing steps. */
+export function positionForAddedStep(
+  existingSteps: FlowEditorStep[],
+  flowLayout: WorkflowFlowLayout
+): { x: number; y: number } {
+  const positions = existingSteps
+    .map((step) => flowLayout[step.clientKey])
+    .filter((position): position is { x: number; y: number } => !!position);
+
+  if (positions.length === 0) {
+    return defaultPosition(existingSteps.length);
+  }
+
+  const rightmost = positions.reduce((best, current) => (current.x > best.x ? current : best));
+  return {
+    x: rightmost.x + WORKFLOW_STEP_NODE_WIDTH + NODE_GAP_X,
+    y: rightmost.y
   };
 }
 
@@ -107,7 +125,10 @@ function buildNodeData(step: FlowEditorStep, selectedClientKey: string | null): 
     color: step.color || '',
     isTerminal: !!step.isTerminal,
     allowAddPackage: !!step.allowAddPackage,
-    selected: selectedClientKey === step.clientKey
+    selected: selectedClientKey === step.clientKey,
+    actionType: step.actionType,
+    hasRoleRules: hasConfiguredRoleRule(step.roleRule),
+    hasContentRules: hasConfiguredContentRule(step.contentRule)
   };
 }
 
@@ -147,6 +168,7 @@ function isBackwardTransition(steps: FlowEditorStep[], sourceKey: string, target
 
 function buildEdges(
   steps: FlowEditorStep[],
+  flowEdgeLayout: WorkflowFlowEdgeLayout,
   transitionColor: string,
   actionColor: string,
   backwardColor: string,
@@ -167,33 +189,37 @@ function buildEdges(
         return;
       }
       const strokeColor = backward ? backwardColor : transitionColor;
+      const storedPath = resolveStoredEdgePath(flowEdgeLayout, step.clientKey, targetKey);
       edges.push({
         id: transitionEdgeId(step.clientKey, targetKey),
         source: step.clientKey,
         target: targetKey,
         sourceHandle: 'source',
         targetHandle: 'target',
-        type: 'smoothstep',
+        type: 'workflowMove',
         selectable: true,
         deletable: true,
+        focusable: true,
+        interactionWidth: WORKFLOW_EDGE_INTERACTION_WIDTH,
         label: backward ? 'Move (back)' : 'Move',
         labelStyle: { fill: strokeColor, fontWeight: 700, fontSize: 13 },
         labelBgStyle: { fill: labelBackground, fillOpacity: 0.95 },
         labelBgPadding: [8, 4] as [number, number],
         labelBgBorderRadius: 4,
+        data: { ...storedPath, backward },
         style: {
           stroke: strokeColor,
           strokeWidth: backward ? 2.5 : 3,
           strokeDasharray: backward ? '10 6' : undefined
         },
-        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, width: 28, height: 28 },
-        zIndex: backward ? 1 : 2
+        markerEnd: { ...WORKFLOW_EDGE_MARKER, color: strokeColor },
+        zIndex: backward ? 8 : 10
       });
     });
 
     const actionTarget = resolveSuccessTarget(step, steps);
     const actionLabel = getStepActionLabel(step.actionType);
-    if (!actionTarget || !actionLabel) {
+    if (!actionTarget || !actionLabel || isArchiveStepAction(step.actionType)) {
       return;
     }
 
@@ -203,7 +229,7 @@ function buildEdges(
       target: actionTarget.clientKey,
       sourceHandle: 'source',
       targetHandle: 'target',
-      type: 'smoothstep',
+      type: 'default',
       animated: true,
       selectable: false,
       deletable: false,
@@ -213,7 +239,7 @@ function buildEdges(
       labelBgPadding: [6, 4] as [number, number],
       labelBgBorderRadius: 4,
       style: { stroke: actionColor, strokeWidth: 2.5, strokeDasharray: '8 5' },
-      markerEnd: { type: MarkerType.ArrowClosed, color: actionColor, width: 24, height: 24 },
+      markerEnd: { ...WORKFLOW_EDGE_MARKER, color: actionColor },
       zIndex: 1
     });
   });
@@ -383,10 +409,12 @@ function FlowViewportInitializer({
 function FlowCanvas({
   steps,
   flowLayout,
+  flowEdgeLayout,
   initialFlowViewport,
   selectedClientKey,
   onSelectStep,
   onFlowLayoutChange,
+  onFlowEdgeLayoutChange,
   onFlowViewportChange,
   onTransitionChange,
   onAddStep
@@ -406,7 +434,13 @@ function FlowCanvas({
   const stepKeys = useMemo(() => steps.map((step) => step.clientKey).join('|'), [steps]);
   const layoutKey = useMemo(() => JSON.stringify(flowLayout), [flowLayout]);
   const stepLabels = useMemo(
-    () => steps.map((step) => `${step.clientKey}:${step.name}:${step.color}`).join('|'),
+    () =>
+      steps
+        .map(
+          (step) =>
+            `${step.clientKey}:${step.name}:${step.color}:${step.actionType ?? ''}:${step.isTerminal}:${step.allowAddPackage}:${hasConfiguredRoleRule(step.roleRule)}:${hasConfiguredContentRule(step.contentRule)}`
+        )
+        .join('|'),
     [steps]
   );
 
@@ -414,18 +448,46 @@ function FlowCanvas({
     buildNodes(steps, flowLayout, selectedClientKey)
   );
 
-  const edges = useMemo(
+  const builtEdges = useMemo(
     () =>
       buildEdges(
         steps,
+        flowEdgeLayout,
         transitionColor,
         actionColor,
         backwardColor,
         showBackwardArrows,
         labelBackground
       ),
-    [steps, transitionColor, actionColor, backwardColor, showBackwardArrows, labelBackground]
+    [steps, flowEdgeLayout, transitionColor, actionColor, backwardColor, showBackwardArrows, labelBackground]
   );
+
+  const edgeSignature = useMemo(
+    () =>
+      steps
+        .map(
+          (step) =>
+            `${step.clientKey}:${(step.transitionStepClientKeys ?? []).join(',')}:${step.actionType ?? ''}:${
+              step.actionSuccessStepClientKey ?? step.actionSuccessStepId ?? ''
+            }`
+        )
+        .join('|') + `|backward=${showBackwardArrows}`,
+    [steps, showBackwardArrows]
+  );
+
+  const flowEdgeLayoutKey = useMemo(() => JSON.stringify(flowEdgeLayout), [flowEdgeLayout]);
+
+  const [flowEdges, setFlowEdges] = React.useState<Edge[]>(builtEdges);
+
+  useEffect(() => {
+    setFlowEdges((current) => {
+      const selectedById = new Map(current.filter((edge) => edge.selected).map((edge) => [edge.id, true]));
+      return builtEdges.map((edge) => ({
+        ...edge,
+        selected: selectedById.get(edge.id) ?? false
+      }));
+    });
+  }, [edgeSignature, flowEdgeLayoutKey, builtEdges]);
 
   useEffect(() => {
     if (isDraggingRef.current) {
@@ -502,6 +564,8 @@ function FlowCanvas({
 
   const handleEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
+      setFlowEdges((current) => applyEdgeChanges(changes, current));
+
       changes.forEach((change) => {
         if (change.type !== 'remove') {
           return;
@@ -523,7 +587,50 @@ function FlowCanvas({
     [onTransitionChange, steps]
   );
 
+  const handleControlOffsetDrag = useCallback((edgeId: string, offset: { offsetX: number; offsetY: number }) => {
+    setFlowEdges((current) =>
+      current.map((edge) =>
+        edge.id === edgeId
+          ? {
+              ...edge,
+              data: {
+                ...(edge.data as Record<string, unknown>),
+                offsetX: offset.offsetX,
+                offsetY: offset.offsetY
+              }
+            }
+          : edge
+      )
+    );
+  }, []);
+
+  const handleControlOffsetDragEnd = useCallback(
+    (edgeId: string, offset: { offsetX: number; offsetY: number }) => {
+      const parsed = parseTransitionEdgeId(edgeId);
+      if (!parsed) {
+        return;
+      }
+      onFlowEdgeLayoutChange({
+        ...flowEdgeLayout,
+        [flowEdgeKey(parsed.sourceKey, parsed.targetKey)]: {
+          offsetX: offset.offsetX,
+          offsetY: offset.offsetY
+        }
+      });
+    },
+    [flowEdgeLayout, onFlowEdgeLayoutChange]
+  );
+
+  const edgeContextValue = useMemo(
+    () => ({
+      onControlOffsetDrag: handleControlOffsetDrag,
+      onControlOffsetDragEnd: handleControlOffsetDragEnd
+    }),
+    [handleControlOffsetDrag, handleControlOffsetDragEnd]
+  );
+
   return (
+    <WorkflowMoveEdgeContext.Provider value={edgeContextValue}>
     <Box
       sx={{
         border: 1,
@@ -535,6 +642,10 @@ function FlowCanvas({
     >
       <Box
         className="crafterwf-workflow-flow-canvas"
+        onPointerDown={(event) => {
+          // Prevent the scrollable dialog from hijacking canvas pan drags.
+          event.stopPropagation();
+        }}
         sx={{
           height: { xs: 360, sm: 420 },
           maxHeight: 'min(50vh, 480px)',
@@ -551,8 +662,9 @@ function FlowCanvas({
       >
         <ReactFlow
           nodes={flowNodes}
-          edges={edges}
+          edges={flowEdges}
           nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onNodeClick={(_, node) => onSelectStep(node.id)}
@@ -563,12 +675,17 @@ function FlowCanvas({
           nodesConnectable
           nodesDraggable
           elementsSelectable
+          edgesFocusable
           selectNodesOnDrag={false}
           panOnDrag
-          panOnScroll={false}
+          panOnScroll
+          panOnScrollMode={PanOnScrollMode.Free}
+          panOnScrollSpeed={0.75}
+          panActivationKeyCode="Space"
           zoomOnScroll={false}
           zoomOnPinch
           connectionMode={ConnectionMode.Loose}
+          connectionLineType={ConnectionLineType.Bezier}
           connectionRadius={48}
           deleteKeyCode={['Backspace', 'Delete']}
           defaultViewport={initialFlowViewport ?? DEFAULT_FLOW_VIEWPORT}
@@ -607,13 +724,16 @@ function FlowCanvas({
         }}
       >
         <Typography variant="body2" color="text.secondary">
-          Drag steps to move. Connect via the blue dots. Use Align row to snap steps horizontally.
+          Drag empty canvas to pan (or hold Space while dragging). Scroll wheel pans when zoom is off.
+          Drag steps to move. Connect via the blue dots. Click a Move line, then drag the blue handle to reposition
+          the curve midpoint (forward and backward lines). Press Delete to remove a selected Move line.
         </Typography>
         <Button size="small" startIcon={<AddRoundedIcon />} onClick={onAddStep}>
           Add step
         </Button>
       </Box>
     </Box>
+    </WorkflowMoveEdgeContext.Provider>
   );
 }
 

@@ -33,7 +33,7 @@ import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 
 import { ApiResponse, ApiResponseErrorState } from '@craftercms/studio-ui';
 import useActiveSiteId from '@craftercms/studio-ui/hooks/useActiveSiteId';
-import { saveWorkflowDefinition, getPublishingTargets, WorkflowDetail, WorkflowFlowLayout, WorkflowFlowViewport, WorkflowStepDto, DEFAULT_FLOW_VIEWPORT, normalizeFlowViewport } from '../../api/adminApi';
+import { saveWorkflowDefinition, getPublishingTargets, WorkflowDetail, WorkflowFlowEdgeLayout, WorkflowFlowLayout, WorkflowFlowViewport, WorkflowStepDto, DEFAULT_FLOW_VIEWPORT, normalizeFlowViewport } from '../../api/adminApi';
 import {
   BOARD_BACKGROUND_SWATCHES,
   normalizeBoardBackgroundId,
@@ -44,8 +44,11 @@ import {
 import ColorSwatchPicker from '../ColorSwatchPicker';
 import { STEP_NAME_MAX_LENGTH, WORKFLOW_NAME_MAX_LENGTH } from '../../consts';
 import {
+  ARCHIVE_ACTION_OPTIONS,
+  isArchiveStepAction,
   normalizeStepActionType,
   PUBLISH_ACTION_OPTIONS,
+  STEP_ACTION_ARCHIVE_PACKAGE,
   STEP_ACTION_NONE,
   SUCCESS_STEP_NONE,
   StepActionType,
@@ -55,7 +58,18 @@ import { defaultContentRule, defaultRoleRule } from '../../stepRules';
 import { EditorEventListener, mapDetailListeners } from '../../eventListeners';
 import WorkflowEventListenersSection from './WorkflowEventListenersSection';
 import WorkflowStepRulesDialog from './WorkflowStepRulesDialog';
-import WorkflowStepsFlowView, { buildDefaultRowLayout, FlowEditorStep } from './WorkflowStepsFlowView';
+import WorkflowStepsFlowView, {
+  buildDefaultRowLayout,
+  FlowEditorStep,
+  positionForAddedStep
+} from './WorkflowStepsFlowView';
+import {
+  mapFlowEdgeLayoutToClientKeys,
+  mapFlowEdgeLayoutToStepIds,
+  parseFlowEdgeKey,
+  flowEdgeKey,
+  pruneFlowEdgeLayout
+} from './workflowFlowEdges';
 
 type EditorStep = FlowEditorStep;
 
@@ -136,6 +150,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
   const [boardBackground, setBoardBackground] = useState(BOARD_BACKGROUND_SWATCHES[0].id);
   const [steps, setSteps] = useState<EditorStep[]>([]);
   const [flowLayout, setFlowLayout] = useState<WorkflowFlowLayout>({});
+  const [flowEdgeLayout, setFlowEdgeLayout] = useState<WorkflowFlowEdgeLayout>({});
   const [flowViewport, setFlowViewport] = useState<WorkflowFlowViewport>(DEFAULT_FLOW_VIEWPORT);
   const [initialFlowViewport, setInitialFlowViewport] = useState<WorkflowFlowViewport | null>(null);
   const [selectedClientKey, setSelectedClientKey] = useState<string | null>(null);
@@ -166,6 +181,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
       setSteps(mappedSteps);
       const loadedLayout = mapFlowLayoutToClientKeys(detail.workflow.flowLayout, mappedSteps);
       setFlowLayout({ ...buildDefaultRowLayout(mappedSteps), ...loadedLayout });
+      setFlowEdgeLayout(mapFlowEdgeLayoutToClientKeys(detail.workflow.flowEdgeLayout, mappedSteps));
       const loadedViewport = normalizeFlowViewport(detail.workflow.flowViewport) ?? DEFAULT_FLOW_VIEWPORT;
       setFlowViewport(loadedViewport);
       setInitialFlowViewport(loadedViewport);
@@ -209,22 +225,41 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
     setFlowViewport(viewport);
   };
 
+  const handleFlowEdgeLayoutChange = (layout: WorkflowFlowEdgeLayout) => {
+    setFlowEdgeLayout(layout);
+  };
+
   const handleTransitionChange = (sourceClientKey: string, targetClientKeys: string[]) => {
     setSteps((current) =>
       current.map((step) =>
         step.clientKey === sourceClientKey ? { ...step, transitionStepClientKeys: targetClientKeys } : step
       )
     );
+    setFlowEdgeLayout((current) => {
+      const allowed = new Set(
+        targetClientKeys.map((targetKey) => flowEdgeKey(sourceClientKey, targetKey))
+      );
+      const next: WorkflowFlowEdgeLayout = {};
+      Object.entries(current).forEach(([key, value]) => {
+        const parsed = parseFlowEdgeKey(key);
+        if (!parsed) {
+          return;
+        }
+        if (parsed.sourceKey === sourceClientKey && !allowed.has(key)) {
+          return;
+        }
+        next[key] = value;
+      });
+      return next;
+    });
   };
 
   const handleAddStep = () => {
     const clientKey = `new-${Date.now()}-${Math.random()}`;
-    const nextIndex = steps.length;
-    const nextLayout = buildDefaultRowLayout([
-      ...steps,
-      { clientKey, name: 'New Step' } as EditorStep
-    ]);
-    setFlowLayout(nextLayout);
+    setFlowLayout((current) => ({
+      ...current,
+      [clientKey]: positionForAddedStep(steps, current)
+    }));
     setSteps([
       ...steps,
       {
@@ -260,6 +295,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
       delete next[removedKey];
       return next;
     });
+    setFlowEdgeLayout((current) => pruneFlowEdgeLayout(current, removedKey));
     setSteps(nextSteps);
     if (selectedClientKey === removedKey) {
       setSelectedClientKey(nextSteps[Math.min(index, nextSteps.length - 1)]?.clientKey ?? null);
@@ -273,6 +309,9 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
   const handleActionTypeChange = (index: number, actionType: StepActionType) => {
     const patch: Partial<EditorStep> = { actionType };
     if (actionType === STEP_ACTION_NONE) {
+      patch.actionSuccessStepClientKey = undefined;
+      patch.actionSuccessStepId = undefined;
+    } else if (actionType === STEP_ACTION_ARCHIVE_PACKAGE) {
       patch.actionSuccessStepClientKey = undefined;
       patch.actionSuccessStepId = undefined;
     } else {
@@ -324,6 +363,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
         bypassWarningMessage: bypassWarningMessage.trim(),
         allowUiBypass,
         flowLayout: mapFlowLayoutToStepIds(flowLayout, steps),
+        flowEdgeLayout: mapFlowEdgeLayoutToStepIds(flowEdgeLayout, steps),
         flowViewport
       },
       createListeners: createListeners.map((listener) => ({
@@ -450,10 +490,12 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
           <WorkflowStepsFlowView
             steps={steps}
             flowLayout={flowLayout}
+            flowEdgeLayout={flowEdgeLayout}
             initialFlowViewport={initialFlowViewport}
             selectedClientKey={selectedClientKey}
             onSelectStep={handleSelectStep}
             onFlowLayoutChange={handleFlowLayoutChange}
+            onFlowEdgeLayoutChange={handleFlowEdgeLayoutChange}
             onFlowViewportChange={handleFlowViewportChange}
             onTransitionChange={handleTransitionChange}
             onAddStep={handleAddStep}
@@ -596,7 +638,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
                       <FormControlLabel
                         value={STEP_ACTION_NONE}
                         control={<Radio size="small" />}
-                        label="No publish action"
+                        label="No Action"
                       />
                       <FormControl component="fieldset" variant="standard" sx={{ mt: 0.5 }}>
                         <FormLabel component="legend" sx={{ typography: 'caption', color: 'text.secondary' }}>
@@ -615,47 +657,72 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
                           ))}
                         </Box>
                       </FormControl>
+                      <FormControl component="fieldset" variant="standard" sx={{ mt: 1 }}>
+                        <FormLabel component="legend" sx={{ typography: 'caption', color: 'text.secondary' }}>
+                          Other automated actions
+                        </FormLabel>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, pl: 0.5, pt: 0.25 }}>
+                          {ARCHIVE_ACTION_OPTIONS.map((option) => (
+                            <FormControlLabel
+                              key={option.value}
+                              value={option.value}
+                              control={<Radio size="small" />}
+                              label={option.label}
+                              sx={{ mr: 1.5 }}
+                            />
+                          ))}
+                        </Box>
+                      </FormControl>
                     </RadioGroup>
 
-                    <FormControl
-                      size="small"
-                      sx={{ maxWidth: 360 }}
-                      disabled={!selectedStep.actionType || selectedStep.actionType === STEP_ACTION_NONE}
-                    >
-                      <InputLabel id={`success-step-label-${selectedStep.clientKey}`}>Step on success</InputLabel>
-                      <Select
-                        labelId={`success-step-label-${selectedStep.clientKey}`}
-                        label="Step on success"
-                        value={
-                          selectedStep.actionSuccessStepClientKey ||
-                          selectedStep.actionSuccessStepId ||
-                          SUCCESS_STEP_NONE
+                    {isArchiveStepAction(selectedStep.actionType) ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420 }}>
+                        Archiving removes the package from the board. It is no longer in the workflow — no success
+                        step is used.
+                      </Typography>
+                    ) : (
+                      <FormControl
+                        size="small"
+                        sx={{ maxWidth: 360 }}
+                        disabled={
+                          !selectedStep.actionType || selectedStep.actionType === STEP_ACTION_NONE
                         }
-                        onChange={(event) => {
-                          const value = event.target.value as string;
-                          if (value === SUCCESS_STEP_NONE) {
-                            updateStep(selectedStepIndex, {
-                              actionSuccessStepClientKey: undefined,
-                              actionSuccessStepId: undefined
-                            });
-                          } else {
-                            updateStep(selectedStepIndex, {
-                              actionSuccessStepClientKey: value,
-                              actionSuccessStepId: undefined
-                            });
-                          }
-                        }}
                       >
-                        <MenuItem value={SUCCESS_STEP_NONE}>None — stay on current step</MenuItem>
-                        {steps
-                          .filter((candidate) => candidate.clientKey !== selectedStep.clientKey)
-                          .map((candidate) => (
-                            <MenuItem key={candidate.clientKey} value={candidate.clientKey}>
-                              {candidate.name?.trim() || 'Untitled step'}
-                            </MenuItem>
-                          ))}
-                      </Select>
-                    </FormControl>
+                        <InputLabel id={`success-step-label-${selectedStep.clientKey}`}>Step on success</InputLabel>
+                        <Select
+                          labelId={`success-step-label-${selectedStep.clientKey}`}
+                          label="Step on success"
+                          value={
+                            selectedStep.actionSuccessStepClientKey ||
+                            selectedStep.actionSuccessStepId ||
+                            SUCCESS_STEP_NONE
+                          }
+                          onChange={(event) => {
+                            const value = event.target.value as string;
+                            if (value === SUCCESS_STEP_NONE) {
+                              updateStep(selectedStepIndex, {
+                                actionSuccessStepClientKey: undefined,
+                                actionSuccessStepId: undefined
+                              });
+                            } else {
+                              updateStep(selectedStepIndex, {
+                                actionSuccessStepClientKey: value,
+                                actionSuccessStepId: undefined
+                              });
+                            }
+                          }}
+                        >
+                          <MenuItem value={SUCCESS_STEP_NONE}>None — stay on current step</MenuItem>
+                          {steps
+                            .filter((candidate) => candidate.clientKey !== selectedStep.clientKey)
+                            .map((candidate) => (
+                              <MenuItem key={candidate.clientKey} value={candidate.clientKey}>
+                                {candidate.name?.trim() || 'Untitled step'}
+                              </MenuItem>
+                            ))}
+                        </Select>
+                      </FormControl>
+                    )}
                   </Stack>
                 </Box>
               ) : (

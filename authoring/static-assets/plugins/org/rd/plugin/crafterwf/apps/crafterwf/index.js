@@ -9282,7 +9282,7 @@ function resolveSandboxItemPath(item) {
     var candidates = [item.path, item.uri, item.localId, item.url];
     for (var _i = 0, candidates_2 = candidates; _i < candidates_2.length; _i++) {
         var candidate = candidates_2[_i];
-        if (typeof candidate === 'string' && isValidContentPath(candidate)) {
+        if (typeof candidate === 'string' && isSandboxContentPath(candidate)) {
             return candidate.trim();
         }
     }
@@ -10492,6 +10492,7 @@ function normalizeStepColorId(value) {
 STEP_COLOR_SWATCHES.map(function (s) { return s.id; });
 
 var STEP_ACTION_NONE = 'none';
+var STEP_ACTION_ARCHIVE_PACKAGE = 'archive_package';
 /** Sentinel for "no success step" in the workflow editor Select (MUI needs a non-empty value). */
 var SUCCESS_STEP_NONE = '__none__';
 var PUBLISH_ACTION_OPTIONS = [
@@ -10500,12 +10501,16 @@ var PUBLISH_ACTION_OPTIONS = [
     { value: 'publish_staging', label: 'Publish to staging', requiresStaging: true },
     { value: 'publish_live', label: 'Publish to live' }
 ];
-var STEP_ACTION_OPTIONS = __spreadArray([
+var ARCHIVE_ACTION_OPTIONS = [
+    { value: 'archive_package', label: 'Archive package' }
+];
+var STEP_ACTION_OPTIONS = __spreadArray(__spreadArray([
     { value: 'none', label: 'None' }
-], PUBLISH_ACTION_OPTIONS, true);
+], PUBLISH_ACTION_OPTIONS, true), ARCHIVE_ACTION_OPTIONS, true);
+var AUTOMATED_ACTION_VALUES = new Set(__spreadArray(__spreadArray([], PUBLISH_ACTION_OPTIONS, true), ARCHIVE_ACTION_OPTIONS, true).map(function (option) { return option.value; }));
 function normalizeStepActionType(value) {
     var type = typeof value === 'string' ? value.trim() : '';
-    if (STEP_ACTION_OPTIONS.some(function (option) { return option.value === type && option.value !== 'none'; })) {
+    if (AUTOMATED_ACTION_VALUES.has(type)) {
         return type;
     }
     return 'none';
@@ -10525,8 +10530,15 @@ function stepActionTypeFromLegacy(step) {
     }
     return 'none';
 }
-function hasPublishStepAction(actionType) {
+function hasStepAction(actionType) {
     return normalizeStepActionType(actionType) !== 'none';
+}
+function hasPublishStepAction(actionType) {
+    var normalized = normalizeStepActionType(actionType);
+    return normalized !== 'none' && normalized !== STEP_ACTION_ARCHIVE_PACKAGE;
+}
+function isArchiveStepAction(actionType) {
+    return normalizeStepActionType(actionType) === STEP_ACTION_ARCHIVE_PACKAGE;
 }
 function getStepActionLabel(actionType) {
     var _a, _b;
@@ -10534,7 +10546,7 @@ function getStepActionLabel(actionType) {
     if (normalized === 'none') {
         return null;
     }
-    return (_b = (_a = PUBLISH_ACTION_OPTIONS.find(function (option) { return option.value === normalized; })) === null || _a === void 0 ? void 0 : _a.label) !== null && _b !== void 0 ? _b : normalized;
+    return ((_b = (_a = STEP_ACTION_OPTIONS.find(function (option) { return option.value === normalized; })) === null || _a === void 0 ? void 0 : _a.label) !== null && _b !== void 0 ? _b : normalized);
 }
 /** Human-readable labels for automatic actions configured on a step (one per step today). */
 function getStepActionDescriptions(actionType) {
@@ -10648,6 +10660,15 @@ function evaluateStepMove(roleRule, contentRule, userGroups, contentPaths, conte
         return roleResult;
     }
     return evaluateContentRule(contentRule, contentPaths, contentTypes);
+}
+function hasConfiguredRoleRule(rule) {
+    var normalized = rule !== null && rule !== void 0 ? rule : defaultRoleRule();
+    return normalized.mode !== 'all' && normalized.roles.length > 0;
+}
+function hasConfiguredContentRule(rule) {
+    var normalized = rule !== null && rule !== void 0 ? rule : defaultContentRule();
+    return (normalized.mode === 'any' &&
+        (normalized.pathPatterns.length > 0 || normalized.contentTypes.length > 0));
 }
 
 var PLUGIN_SERVICE_BASE = '/studio/api/2/plugin/script/plugins/org/rd/plugin/crafterwf/crafterwf';
@@ -13348,7 +13369,7 @@ var Board = function (_a) {
         if (sourceListId !== targetListId &&
             targetList &&
             card &&
-            hasPublishStepAction(targetList.actionType)) {
+            hasStepAction(targetList.actionType)) {
             var actionLabel = getStepActionLabel(targetList.actionType);
             if (actionLabel && state.lists) {
                 var nextLists = moveCardBetweenLists(state.lists, cardId, sourceListId, targetListId, targetListIdIndex);
@@ -13363,7 +13384,8 @@ var Board = function (_a) {
                     targetIndex: targetListIdIndex,
                     cardName: card.name,
                     stepName: targetList.name,
-                    actionLabel: actionLabel
+                    actionLabel: actionLabel,
+                    isArchiveAction: isArchiveStepAction(targetList.actionType)
                 });
                 return;
             }
@@ -13622,7 +13644,7 @@ var Board = function (_a) {
                                         textOverflow: 'ellipsis',
                                         whiteSpace: 'nowrap'
                                     } }, list.name),
-                                hasPublishStepAction(list.actionType) && (React$2.createElement(Tooltip, { arrow: true, placement: "top", enterDelay: 200, title: React$2.createElement(Stack, { component: "span", spacing: 0.25, sx: { py: 0.25 } },
+                                hasStepAction(list.actionType) && (React$2.createElement(Tooltip, { arrow: true, placement: "top", enterDelay: 200, title: React$2.createElement(Stack, { component: "span", spacing: 0.25, sx: { py: 0.25 } },
                                         React$2.createElement(Typography, { component: "span", variant: "caption", sx: { fontWeight: 600, display: 'block' } }, "Automatic actions"),
                                         getStepActionDescriptions(list.actionType).map(function (description) { return (React$2.createElement(Typography, { key: description, component: "span", variant: "caption", sx: { display: 'block' } },
                                             "\u2022 ",
@@ -13704,7 +13726,9 @@ var Board = function (_a) {
                     " will automatically perform",
                     ' ',
                     React$2.createElement("strong", null, pendingStepActionMove === null || pendingStepActionMove === void 0 ? void 0 : pendingStepActionMove.actionLabel),
-                    " on the package's attached content."),
+                    (pendingStepActionMove === null || pendingStepActionMove === void 0 ? void 0 : pendingStepActionMove.isArchiveAction)
+                        ? '. The package will be removed from the board.'
+                        : ' on the package\u2019s attached content.'),
                 React$2.createElement(Typography, { variant: "body2", color: "text.secondary", sx: { mt: 1.5 } }, "Do you want to continue?")),
             React$2.createElement(DialogActions, null,
                 React$2.createElement(Button, { onClick: handleCancelStepActionMove, disabled: movingCard }, "Cancel"),
@@ -17623,14 +17647,6 @@ function processWorkflowContentEvent(siteId, eventType, contentPath, contentType
     return pluginGet("".concat(PLUGIN_SERVICE_BASE, "/content-event/process.json?").concat(params.toString()));
 }
 
-var PREVIEW_PATH = '/studio/preview';
-var DEDUPE_MS = 3000;
-function isPreviewStudioShell() {
-    return typeof window !== 'undefined' && window.location.pathname.startsWith(PREVIEW_PATH);
-}
-function dedupeKey(siteId, eventType, contentPath) {
-    return "".concat(siteId, "|").concat(eventType, "|").concat(contentPath);
-}
 /** Map Studio socket/lifecycle hints to plugin create|edit; preview saves default to edit. */
 function resolveBridgeEventType(payload) {
     var _a, _b;
@@ -17645,6 +17661,15 @@ function resolveBridgeEventType(payload) {
         return 'edit';
     }
     return 'edit';
+}
+
+var PREVIEW_PATH = '/studio/preview';
+var DEDUPE_MS = 3000;
+function isPreviewStudioShell() {
+    return typeof window !== 'undefined' && window.location.pathname.startsWith(PREVIEW_PATH);
+}
+function dedupeKey(siteId, eventType, contentPath) {
+    return "".concat(siteId, "|").concat(eventType, "|").concat(contentPath);
 }
 /**
  * Preview / in-context saves use Studio's preview content pipeline, which does not run
@@ -29537,6 +29562,7 @@ var WorkflowStepFlowNode = function (_a) {
     var stepData = data;
     var stepColor = resolveStepColor(stepData.color);
     var isSelected = selected || stepData.selected;
+    var actionLabel = hasStepAction(stepData.actionType) ? getStepActionLabel(stepData.actionType) : null;
     var handleStyle = {
         width: 20,
         height: 20,
@@ -29565,7 +29591,10 @@ var WorkflowStepFlowNode = function (_a) {
             React$2.createElement(Typography, { variant: "h6", fontWeight: 700, sx: { fontSize: '1.15rem', lineHeight: 1.3, pr: 1 } }, stepData.label),
             React$2.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 } },
                 stepData.isTerminal ? (React$2.createElement(Chip, { label: "Terminal", size: "medium", sx: { height: 28, fontSize: '0.8rem' } })) : null,
-                stepData.allowAddPackage ? (React$2.createElement(Chip, { label: "+ Package", size: "medium", sx: { height: 28, fontSize: '0.8rem' } })) : null)),
+                stepData.allowAddPackage ? (React$2.createElement(Chip, { label: "+ Package", size: "medium", sx: { height: 28, fontSize: '0.8rem' } })) : null,
+                actionLabel ? (React$2.createElement(Chip, { label: actionLabel, size: "medium", color: "primary", variant: "outlined", sx: { height: 28, fontSize: '0.8rem' } })) : null,
+                stepData.hasRoleRules ? (React$2.createElement(Chip, { label: "Role rules", size: "medium", variant: "outlined", sx: { height: 28, fontSize: '0.8rem' } })) : null,
+                stepData.hasContentRules ? (React$2.createElement(Chip, { label: "Content rules", size: "medium", variant: "outlined", sx: { height: 28, fontSize: '0.8rem' } })) : null)),
         React$2.createElement(WorkflowFlowHandle, { type: "source", position: Position.Right, id: "source", style: handleStyle })));
 };
 var WorkflowStepFlowNode$1 = memo(WorkflowStepFlowNode);
@@ -29573,7 +29602,7 @@ var WorkflowStepFlowNode$1 = memo(WorkflowStepFlowNode);
 var REACT_FLOW_STYLES_ID = 'crafterwf-react-flow-styles';
 var REACT_FLOW_CRITICAL_ID = 'crafterwf-react-flow-critical';
 function buildCriticalReactFlowCss(canvasBg, nodeBg, handleBorder, handleBg) {
-    return "\n.crafterwf-workflow-flow-canvas .react-flow {\n  width: 100%;\n  height: 100%;\n  position: relative;\n  overflow: hidden;\n  background: ".concat(canvasBg, ";\n}\n.crafterwf-workflow-flow-canvas .react-flow__container {\n  position: absolute;\n  width: 100%;\n  height: 100%;\n  top: 0;\n  left: 0;\n}\n.crafterwf-workflow-flow-canvas .react-flow__background {\n  pointer-events: none !important;\n  z-index: 0 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__pane {\n  z-index: 1 !important;\n  touch-action: none;\n}\n.crafterwf-workflow-flow-canvas .react-flow__pane.draggable {\n  cursor: grab;\n}\n.crafterwf-workflow-flow-canvas .react-flow__pane.dragging {\n  cursor: grabbing;\n}\n.crafterwf-workflow-flow-canvas .react-flow__viewport {\n  z-index: 2 !important;\n  pointer-events: none !important;\n  touch-action: none;\n}\n.crafterwf-workflow-flow-canvas .react-flow__renderer {\n  position: relative;\n  z-index: 4 !important;\n  pointer-events: none !important;\n  width: 100%;\n  height: 100%;\n}\n.crafterwf-workflow-flow-canvas .react-flow__nodes {\n  pointer-events: none !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__node {\n  pointer-events: all !important;\n  cursor: grab;\n  z-index: 2 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__node.dragging {\n  cursor: grabbing;\n  z-index: 3 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__node .crafterwf-workflow-step-node {\n  background: ").concat(nodeBg, " !important;\n  opacity: 1 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__panel {\n  z-index: 10 !important;\n  pointer-events: all !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__handle {\n  width: 18px !important;\n  height: 18px !important;\n  min-width: 18px !important;\n  min-height: 18px !important;\n  border-radius: 50%;\n  border: 2px solid ").concat(handleBorder, " !important;\n  background: ").concat(handleBg, " !important;\n  z-index: 10;\n  pointer-events: all !important;\n  cursor: crosshair;\n}\n.crafterwf-workflow-flow-canvas .react-flow__handle.connectable,\n.crafterwf-workflow-flow-canvas .react-flow__handle.connectionindicator,\n.crafterwf-workflow-flow-canvas .react-flow__handle.connectingfrom {\n  pointer-events: all !important;\n  cursor: crosshair;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edge-path {\n  stroke-width: 2.5px;\n}\n");
+    return "\n.crafterwf-workflow-flow-canvas .react-flow {\n  width: 100%;\n  height: 100%;\n  position: relative;\n  overflow: hidden;\n  background: ".concat(canvasBg, ";\n}\n.crafterwf-workflow-flow-canvas .react-flow__container {\n  position: absolute;\n  width: 100%;\n  height: 100%;\n  top: 0;\n  left: 0;\n}\n.crafterwf-workflow-flow-canvas .react-flow__background {\n  pointer-events: none !important;\n  z-index: 0 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__pane {\n  z-index: 1 !important;\n  touch-action: none;\n  pointer-events: all !important;\n  cursor: grab;\n}\n.crafterwf-workflow-flow-canvas .react-flow__pane.draggable {\n  cursor: grab;\n}\n.crafterwf-workflow-flow-canvas .react-flow__pane.dragging {\n  cursor: grabbing;\n}\n.crafterwf-workflow-flow-canvas .react-flow__viewport {\n  z-index: 2 !important;\n  pointer-events: none !important;\n  touch-action: none;\n}\n.crafterwf-workflow-flow-canvas .react-flow__renderer {\n  position: relative;\n  z-index: 4 !important;\n  touch-action: none;\n}\n.crafterwf-workflow-flow-canvas .react-flow__nodes {\n  pointer-events: none !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__node {\n  pointer-events: all !important;\n  cursor: grab;\n  z-index: 2 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__node.dragging {\n  cursor: grabbing;\n  z-index: 3 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__node .crafterwf-workflow-step-node {\n  background: ").concat(nodeBg, " !important;\n  opacity: 1 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__panel {\n  z-index: 10 !important;\n  pointer-events: all !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__handle {\n  width: 18px !important;\n  height: 18px !important;\n  min-width: 18px !important;\n  min-height: 18px !important;\n  border-radius: 50%;\n  border: 2px solid ").concat(handleBorder, " !important;\n  background: ").concat(handleBg, " !important;\n  z-index: 10;\n  pointer-events: all !important;\n  cursor: crosshair;\n}\n.crafterwf-workflow-flow-canvas .react-flow__handle.connectable,\n.crafterwf-workflow-flow-canvas .react-flow__handle.connectionindicator,\n.crafterwf-workflow-flow-canvas .react-flow__handle.connectingfrom {\n  pointer-events: all !important;\n  cursor: crosshair;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edges {\n  pointer-events: none !important;\n  z-index: 5 !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edges svg {\n  pointer-events: none !important;\n  overflow: visible !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edges svg g.react-flow__edge {\n  pointer-events: all !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edge.selectable {\n  cursor: pointer;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edge-interaction {\n  pointer-events: stroke !important;\n  cursor: pointer;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edge-textwrapper {\n  pointer-events: all !important;\n  cursor: pointer;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edge.selected .react-flow__edge-path {\n  stroke-width: 3.5px !important;\n}\n.crafterwf-workflow-flow-canvas .crafterwf-workflow-edge-handle {\n  pointer-events: all !important;\n}\n.crafterwf-workflow-flow-canvas .react-flow__edge-path {\n  stroke-width: 2.5px;\n}\n");
 }
 function getReactFlowCssPath(siteId) {
     var base = '/studio/static-assets/plugins/org/rd/plugin/crafterwf/apps/crafterwf/react-flow.css';
@@ -29619,29 +29648,198 @@ function useReactFlowStyles(siteId) {
     ]);
 }
 
-var NODE_TYPES = {
-    workflowStep: WorkflowStepFlowNode$1
-};
-var NODE_GAP_X = 24;
-var DEFAULT_ORIGIN = { x: 32, y: 48 };
 var TRANSITION_EDGE_PREFIX = 'transition::';
+var WORKFLOW_EDGE_MARKER = {
+    type: MarkerType.ArrowClosed,
+    width: 14,
+    height: 14
+};
+var WORKFLOW_EDGE_INTERACTION_WIDTH = 40;
 function transitionEdgeId(sourceKey, targetKey) {
-    return "".concat(TRANSITION_EDGE_PREFIX).concat(sourceKey, "::").concat(targetKey);
+    return "".concat(TRANSITION_EDGE_PREFIX).concat(flowEdgeKey(sourceKey, targetKey));
+}
+function flowEdgeKey(sourceKey, targetKey) {
+    return "".concat(sourceKey, "::").concat(targetKey);
 }
 function parseTransitionEdgeId(edgeId) {
     if (!edgeId.startsWith(TRANSITION_EDGE_PREFIX)) {
         return null;
     }
-    var body = edgeId.slice(TRANSITION_EDGE_PREFIX.length);
-    var splitAt = body.indexOf('::');
+    return parseFlowEdgeKey(edgeId.slice(TRANSITION_EDGE_PREFIX.length));
+}
+function parseFlowEdgeKey(key) {
+    var splitAt = key.indexOf('::');
     if (splitAt <= 0) {
         return null;
     }
     return {
-        sourceKey: body.slice(0, splitAt),
-        targetKey: body.slice(splitAt + 2)
+        sourceKey: key.slice(0, splitAt),
+        targetKey: key.slice(splitAt + 2)
     };
 }
+function edgeMidpoint(sourceX, sourceY, targetX, targetY) {
+    return {
+        x: (sourceX + targetX) / 2,
+        y: (sourceY + targetY) / 2
+    };
+}
+function perpendicularUnitVector(sourceX, sourceY, targetX, targetY) {
+    var dx = targetX - sourceX;
+    var dy = targetY - sourceY;
+    var length = Math.hypot(dx, dy) || 1;
+    return { x: -dy / length, y: dx / length };
+}
+function defaultEdgeControlOffset(sourceX, sourceY, targetX, targetY, backward) {
+    var _a = perpendicularUnitVector(sourceX, sourceY, targetX, targetY), perpX = _a.x, perpY = _a.y;
+    var length = Math.hypot(targetX - sourceX, targetY - sourceY) || 1;
+    var magnitude = length * (backward ? 0.22 : 0.12);
+    var sign = backward ? -1 : 1;
+    return {
+        offsetX: perpX * magnitude * sign,
+        offsetY: perpY * magnitude * sign
+    };
+}
+/** Maps legacy curvature storage to a midpoint offset (approximate migration). */
+function controlOffsetFromCurvature(sourceX, sourceY, targetX, targetY, curvature) {
+    var _a = perpendicularUnitVector(sourceX, sourceY, targetX, targetY), perpX = _a.x, perpY = _a.y;
+    var length = Math.hypot(targetX - sourceX, targetY - sourceY) || 1;
+    var magnitude = length * (curvature - 0.25) * 0.55;
+    return { offsetX: perpX * magnitude, offsetY: perpY * magnitude };
+}
+function computeControlOffsetFromHandle(sourceX, sourceY, targetX, targetY, handleX, handleY) {
+    var _a = edgeMidpoint(sourceX, sourceY, targetX, targetY), midX = _a.x, midY = _a.y;
+    return {
+        offsetX: handleX - midX,
+        offsetY: handleY - midY
+    };
+}
+function resolveStoredEdgePath(layout, sourceKey, targetKey) {
+    return layout === null || layout === void 0 ? void 0 : layout[flowEdgeKey(sourceKey, targetKey)];
+}
+function resolveEdgeControlOffset(stored, sourceX, sourceY, targetX, targetY, backward) {
+    if (stored && typeof stored.offsetX === 'number' && typeof stored.offsetY === 'number') {
+        return { offsetX: stored.offsetX, offsetY: stored.offsetY };
+    }
+    if (stored && typeof stored.curvature === 'number' && Number.isFinite(stored.curvature)) {
+        return controlOffsetFromCurvature(sourceX, sourceY, targetX, targetY, Math.max(0.05, Math.min(0.9, stored.curvature)));
+    }
+    return defaultEdgeControlOffset(sourceX, sourceY, targetX, targetY, backward);
+}
+/** Quadratic bezier with the handle placed on the curve at t = 0.5. */
+function buildQuadraticBezierPath(sourceX, sourceY, targetX, targetY, offset) {
+    var _a = edgeMidpoint(sourceX, sourceY, targetX, targetY), midX = _a.x, midY = _a.y;
+    var handleX = midX + offset.offsetX;
+    var handleY = midY + offset.offsetY;
+    var controlX = 2 * handleX - midX;
+    var controlY = 2 * handleY - midY;
+    var path = "M ".concat(sourceX, ",").concat(sourceY, " Q ").concat(controlX, ",").concat(controlY, " ").concat(targetX, ",").concat(targetY);
+    var t = 0.5;
+    var labelX = (1 - t) * (1 - t) * sourceX + 2 * (1 - t) * t * controlX + t * t * targetX;
+    var labelY = (1 - t) * (1 - t) * sourceY + 2 * (1 - t) * t * controlY + t * t * targetY;
+    return { path: path, handleX: handleX, handleY: handleY, labelX: labelX, labelY: labelY };
+}
+function mapFlowEdgeLayoutToClientKeys(layout, steps) {
+    if (!layout) {
+        return {};
+    }
+    var idToClientKey = new Map(steps.filter(function (step) { return step.id; }).map(function (step) { return [step.id, step.clientKey]; }));
+    var mapped = {};
+    Object.entries(layout).forEach(function (_a) {
+        var _b, _c;
+        var key = _a[0], value = _a[1];
+        var parsed = parseFlowEdgeKey(key);
+        if (!parsed || !value || typeof value !== 'object') {
+            return;
+        }
+        var sourceKey = (_b = idToClientKey.get(parsed.sourceKey)) !== null && _b !== void 0 ? _b : parsed.sourceKey;
+        var targetKey = (_c = idToClientKey.get(parsed.targetKey)) !== null && _c !== void 0 ? _c : parsed.targetKey;
+        if (steps.some(function (step) { return step.clientKey === sourceKey; }) && steps.some(function (step) { return step.clientKey === targetKey; })) {
+            mapped[flowEdgeKey(sourceKey, targetKey)] = value;
+        }
+    });
+    return mapped;
+}
+function mapFlowEdgeLayoutToStepIds(layout, steps) {
+    var clientKeyToId = new Map(steps.filter(function (step) { return step.id; }).map(function (step) { return [step.clientKey, step.id]; }));
+    var mapped = {};
+    Object.entries(layout).forEach(function (_a) {
+        var _b, _c;
+        var key = _a[0], value = _a[1];
+        var parsed = parseFlowEdgeKey(key);
+        if (!parsed) {
+            return;
+        }
+        var sourceId = (_b = clientKeyToId.get(parsed.sourceKey)) !== null && _b !== void 0 ? _b : parsed.sourceKey;
+        var targetId = (_c = clientKeyToId.get(parsed.targetKey)) !== null && _c !== void 0 ? _c : parsed.targetKey;
+        mapped[flowEdgeKey(sourceId, targetId)] = value;
+    });
+    return mapped;
+}
+function pruneFlowEdgeLayout(layout, removedStepKey) {
+    var next = {};
+    Object.entries(layout).forEach(function (_a) {
+        var key = _a[0], value = _a[1];
+        var parsed = parseFlowEdgeKey(key);
+        if (!parsed || parsed.sourceKey === removedStepKey || parsed.targetKey === removedStepKey) {
+            return;
+        }
+        next[key] = value;
+    });
+    return next;
+}
+
+var WorkflowMoveEdgeContext = React$2.createContext(null);
+function resolveOffset(edgeData, sourceX, sourceY, targetX, targetY) {
+    if (edgeData && typeof edgeData.offsetX === 'number' && typeof edgeData.offsetY === 'number') {
+        return { offsetX: edgeData.offsetX, offsetY: edgeData.offsetY };
+    }
+    return resolveEdgeControlOffset(edgeData, sourceX, sourceY, targetX, targetY, Boolean(edgeData === null || edgeData === void 0 ? void 0 : edgeData.backward));
+}
+var WorkflowMoveEdge = function (_a) {
+    var id = _a.id, sourceX = _a.sourceX, sourceY = _a.sourceY, targetX = _a.targetX, targetY = _a.targetY, markerEnd = _a.markerEnd, style = _a.style, selected = _a.selected, label = _a.label, labelStyle = _a.labelStyle, labelBgStyle = _a.labelBgStyle, labelBgPadding = _a.labelBgPadding, labelBgBorderRadius = _a.labelBgBorderRadius, data = _a.data;
+    var theme = useTheme();
+    var screenToFlowPosition = useReactFlow().screenToFlowPosition;
+    var edgeContext = useContext(WorkflowMoveEdgeContext);
+    var edgeData = data;
+    var latestOffsetRef = useRef$1(resolveOffset(edgeData, sourceX, sourceY, targetX, targetY));
+    var offset = resolveOffset(edgeData, sourceX, sourceY, targetX, targetY);
+    latestOffsetRef.current = offset;
+    var _b = buildQuadraticBezierPath(sourceX, sourceY, targetX, targetY, offset), path = _b.path, handleX = _b.handleX, handleY = _b.handleY, labelX = _b.labelX, labelY = _b.labelY;
+    var handlePointerDown = useCallback$1(function (event) {
+        event.stopPropagation();
+        event.preventDefault();
+        var applyOffset = function (handleXPos, handleYPos) {
+            var next = computeControlOffsetFromHandle(sourceX, sourceY, targetX, targetY, handleXPos, handleYPos);
+            latestOffsetRef.current = next;
+            edgeContext === null || edgeContext === void 0 ? void 0 : edgeContext.onControlOffsetDrag(id, next);
+        };
+        var onPointerMove = function (moveEvent) {
+            moveEvent.preventDefault();
+            var flow = screenToFlowPosition({ x: moveEvent.clientX, y: moveEvent.clientY });
+            applyOffset(flow.x, flow.y);
+        };
+        var onPointerUp = function () {
+            edgeContext === null || edgeContext === void 0 ? void 0 : edgeContext.onControlOffsetDragEnd(id, latestOffsetRef.current);
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+        };
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+    }, [edgeContext, id, screenToFlowPosition, sourceX, sourceY, targetX, targetY]);
+    return (React$2.createElement(React$2.Fragment, null,
+        React$2.createElement(BaseEdge, { id: id, path: path, markerEnd: markerEnd, style: style, label: label, labelStyle: labelStyle, labelBgStyle: labelBgStyle, labelBgPadding: labelBgPadding, labelBgBorderRadius: labelBgBorderRadius, labelX: labelX, labelY: labelY, interactionWidth: WORKFLOW_EDGE_INTERACTION_WIDTH }),
+        selected ? (React$2.createElement("circle", { className: "crafterwf-workflow-edge-handle nodrag nopan", cx: handleX, cy: handleY, r: 10, fill: theme.palette.primary.main, stroke: theme.palette.background.paper, strokeWidth: 2, style: { pointerEvents: 'all', cursor: 'grab' }, onPointerDown: handlePointerDown })) : null));
+};
+var WorkflowMoveEdge$1 = memo(WorkflowMoveEdge);
+
+var NODE_TYPES = {
+    workflowStep: WorkflowStepFlowNode$1
+};
+var EDGE_TYPES = {
+    workflowMove: WorkflowMoveEdge$1
+};
+var NODE_GAP_X = 24;
+var DEFAULT_ORIGIN = { x: 32, y: 48 };
 function buildDefaultRowLayout(steps) {
     var layout = {};
     steps.forEach(function (step, index) {
@@ -29653,6 +29851,20 @@ function defaultPosition(index) {
     return {
         x: DEFAULT_ORIGIN.x + index * (WORKFLOW_STEP_NODE_WIDTH + NODE_GAP_X),
         y: DEFAULT_ORIGIN.y
+    };
+}
+/** Canvas position for a newly added step without moving existing steps. */
+function positionForAddedStep(existingSteps, flowLayout) {
+    var positions = existingSteps
+        .map(function (step) { return flowLayout[step.clientKey]; })
+        .filter(function (position) { return !!position; });
+    if (positions.length === 0) {
+        return defaultPosition(existingSteps.length);
+    }
+    var rightmost = positions.reduce(function (best, current) { return (current.x > best.x ? current : best); });
+    return {
+        x: rightmost.x + WORKFLOW_STEP_NODE_WIDTH + NODE_GAP_X,
+        y: rightmost.y
     };
 }
 function resolveSuccessTarget(step, steps) {
@@ -29673,7 +29885,10 @@ function buildNodeData(step, selectedClientKey) {
         color: step.color || '',
         isTerminal: !!step.isTerminal,
         allowAddPackage: !!step.allowAddPackage,
-        selected: selectedClientKey === step.clientKey
+        selected: selectedClientKey === step.clientKey,
+        actionType: step.actionType,
+        hasRoleRules: hasConfiguredRoleRule(step.roleRule),
+        hasContentRules: hasConfiguredContentRule(step.contentRule)
     };
 }
 function buildNodes(steps, flowLayout, selectedClientKey) {
@@ -29704,7 +29919,7 @@ function isBackwardTransition(steps, sourceKey, targetKey) {
     }
     return targetIndex < sourceIndex;
 }
-function buildEdges(steps, transitionColor, actionColor, backwardColor, showBackwardArrows, labelBackground) {
+function buildEdges(steps, flowEdgeLayout, transitionColor, actionColor, backwardColor, showBackwardArrows, labelBackground) {
     var edges = [];
     var stepByKey = new Map(steps.map(function (step) { return [step.clientKey, step]; }));
     steps.forEach(function (step) {
@@ -29719,32 +29934,36 @@ function buildEdges(steps, transitionColor, actionColor, backwardColor, showBack
                 return;
             }
             var strokeColor = backward ? backwardColor : transitionColor;
+            var storedPath = resolveStoredEdgePath(flowEdgeLayout, step.clientKey, targetKey);
             edges.push({
                 id: transitionEdgeId(step.clientKey, targetKey),
                 source: step.clientKey,
                 target: targetKey,
                 sourceHandle: 'source',
                 targetHandle: 'target',
-                type: 'smoothstep',
+                type: 'workflowMove',
                 selectable: true,
                 deletable: true,
+                focusable: true,
+                interactionWidth: WORKFLOW_EDGE_INTERACTION_WIDTH,
                 label: backward ? 'Move (back)' : 'Move',
                 labelStyle: { fill: strokeColor, fontWeight: 700, fontSize: 13 },
                 labelBgStyle: { fill: labelBackground, fillOpacity: 0.95 },
                 labelBgPadding: [8, 4],
                 labelBgBorderRadius: 4,
+                data: __assign(__assign({}, storedPath), { backward: backward }),
                 style: {
                     stroke: strokeColor,
                     strokeWidth: backward ? 2.5 : 3,
                     strokeDasharray: backward ? '10 6' : undefined
                 },
-                markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, width: 28, height: 28 },
-                zIndex: backward ? 1 : 2
+                markerEnd: __assign(__assign({}, WORKFLOW_EDGE_MARKER), { color: strokeColor }),
+                zIndex: backward ? 8 : 10
             });
         });
         var actionTarget = resolveSuccessTarget(step, steps);
         var actionLabel = getStepActionLabel(step.actionType);
-        if (!actionTarget || !actionLabel) {
+        if (!actionTarget || !actionLabel || isArchiveStepAction(step.actionType)) {
             return;
         }
         edges.push({
@@ -29753,7 +29972,7 @@ function buildEdges(steps, transitionColor, actionColor, backwardColor, showBack
             target: actionTarget.clientKey,
             sourceHandle: 'source',
             targetHandle: 'target',
-            type: 'smoothstep',
+            type: 'default',
             animated: true,
             selectable: false,
             deletable: false,
@@ -29763,7 +29982,7 @@ function buildEdges(steps, transitionColor, actionColor, backwardColor, showBack
             labelBgPadding: [6, 4],
             labelBgBorderRadius: 4,
             style: { stroke: actionColor, strokeWidth: 2.5, strokeDasharray: '8 5' },
-            markerEnd: { type: MarkerType.ArrowClosed, color: actionColor, width: 24, height: 24 },
+            markerEnd: __assign(__assign({}, WORKFLOW_EDGE_MARKER), { color: actionColor }),
             zIndex: 1
         });
     });
@@ -29844,7 +30063,7 @@ function FlowViewportInitializer(_a) {
     return null;
 }
 function FlowCanvas(_a) {
-    var steps = _a.steps, flowLayout = _a.flowLayout, initialFlowViewport = _a.initialFlowViewport, selectedClientKey = _a.selectedClientKey, onSelectStep = _a.onSelectStep, onFlowLayoutChange = _a.onFlowLayoutChange, onFlowViewportChange = _a.onFlowViewportChange, onTransitionChange = _a.onTransitionChange, onAddStep = _a.onAddStep;
+    var steps = _a.steps, flowLayout = _a.flowLayout, flowEdgeLayout = _a.flowEdgeLayout, initialFlowViewport = _a.initialFlowViewport, selectedClientKey = _a.selectedClientKey, onSelectStep = _a.onSelectStep, onFlowLayoutChange = _a.onFlowLayoutChange, onFlowEdgeLayoutChange = _a.onFlowEdgeLayoutChange, onFlowViewportChange = _a.onFlowViewportChange, onTransitionChange = _a.onTransitionChange, onAddStep = _a.onAddStep;
     var siteId = useActiveSiteId();
     useReactFlowStyles(siteId);
     var theme = useTheme();
@@ -29857,13 +30076,36 @@ function FlowCanvas(_a) {
     var _b = React$2.useState(false), showBackwardArrows = _b[0], setShowBackwardArrows = _b[1];
     var stepKeys = useMemo$2(function () { return steps.map(function (step) { return step.clientKey; }).join('|'); }, [steps]);
     var layoutKey = useMemo$2(function () { return JSON.stringify(flowLayout); }, [flowLayout]);
-    var stepLabels = useMemo$2(function () { return steps.map(function (step) { return "".concat(step.clientKey, ":").concat(step.name, ":").concat(step.color); }).join('|'); }, [steps]);
+    var stepLabels = useMemo$2(function () {
+        return steps
+            .map(function (step) { var _a; return "".concat(step.clientKey, ":").concat(step.name, ":").concat(step.color, ":").concat((_a = step.actionType) !== null && _a !== void 0 ? _a : '', ":").concat(step.isTerminal, ":").concat(step.allowAddPackage, ":").concat(hasConfiguredRoleRule(step.roleRule), ":").concat(hasConfiguredContentRule(step.contentRule)); })
+            .join('|');
+    }, [steps]);
     var _c = React$2.useState(function () {
         return buildNodes(steps, flowLayout, selectedClientKey);
     }), flowNodes = _c[0], setFlowNodes = _c[1];
-    var edges = useMemo$2(function () {
-        return buildEdges(steps, transitionColor, actionColor, backwardColor, showBackwardArrows, labelBackground);
-    }, [steps, transitionColor, actionColor, backwardColor, showBackwardArrows, labelBackground]);
+    var builtEdges = useMemo$2(function () {
+        return buildEdges(steps, flowEdgeLayout, transitionColor, actionColor, backwardColor, showBackwardArrows, labelBackground);
+    }, [steps, flowEdgeLayout, transitionColor, actionColor, backwardColor, showBackwardArrows, labelBackground]);
+    var edgeSignature = useMemo$2(function () {
+        return steps
+            .map(function (step) {
+            var _a, _b, _c, _d;
+            return "".concat(step.clientKey, ":").concat(((_a = step.transitionStepClientKeys) !== null && _a !== void 0 ? _a : []).join(','), ":").concat((_b = step.actionType) !== null && _b !== void 0 ? _b : '', ":").concat((_d = (_c = step.actionSuccessStepClientKey) !== null && _c !== void 0 ? _c : step.actionSuccessStepId) !== null && _d !== void 0 ? _d : '');
+        })
+            .join('|') + "|backward=".concat(showBackwardArrows);
+    }, [steps, showBackwardArrows]);
+    var flowEdgeLayoutKey = useMemo$2(function () { return JSON.stringify(flowEdgeLayout); }, [flowEdgeLayout]);
+    var _d = React$2.useState(builtEdges), flowEdges = _d[0], setFlowEdges = _d[1];
+    useEffect$2(function () {
+        setFlowEdges(function (current) {
+            var selectedById = new Map(current.filter(function (edge) { return edge.selected; }).map(function (edge) { return [edge.id, true]; }));
+            return builtEdges.map(function (edge) {
+                var _a;
+                return (__assign(__assign({}, edge), { selected: (_a = selectedById.get(edge.id)) !== null && _a !== void 0 ? _a : false }));
+            });
+        });
+    }, [edgeSignature, flowEdgeLayoutKey, builtEdges]);
     useEffect$2(function () {
         if (isDraggingRef.current) {
             return;
@@ -29921,6 +30163,7 @@ function FlowCanvas(_a) {
         onTransitionChange(source, __spreadArray(__spreadArray([], existing, true), [target], false));
     }, [onTransitionChange, steps]);
     var handleEdgesChange = useCallback$1(function (changes) {
+        setFlowEdges(function (current) { return applyEdgeChanges(changes, current); });
         changes.forEach(function (change) {
             var _a;
             if (change.type !== 'remove') {
@@ -29938,44 +30181,71 @@ function FlowCanvas(_a) {
             onTransitionChange(parsed.sourceKey, nextTargets);
         });
     }, [onTransitionChange, steps]);
-    return (React$2.createElement(Box, { sx: {
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: 1.5,
-            bgcolor: 'background.default',
-            overflow: 'hidden'
-        } },
-        React$2.createElement(Box, { className: "crafterwf-workflow-flow-canvas", sx: {
-                height: { xs: 360, sm: 420 },
-                maxHeight: 'min(50vh, 480px)',
-                width: '100%',
-                position: 'relative',
-                touchAction: 'none',
-                userSelect: 'none',
-                '& .react-flow': {
-                    width: '100%',
-                    height: '100%',
-                    bgcolor: 'background.default'
-                }
-            } },
-            React$2.createElement(index, { nodes: flowNodes, edges: edges, nodeTypes: NODE_TYPES, onNodesChange: handleNodesChange, onEdgesChange: handleEdgesChange, onNodeClick: function (_, node) { return onSelectStep(node.id); }, onNodeDragStart: handleNodeDragStart, onNodeDragStop: handleNodeDragStop, onConnect: handleConnect, onMoveEnd: handleMoveEnd, nodesConnectable: true, nodesDraggable: true, elementsSelectable: true, selectNodesOnDrag: false, panOnDrag: true, panOnScroll: false, zoomOnScroll: false, zoomOnPinch: true, connectionMode: ConnectionMode.Loose, connectionRadius: 48, deleteKeyCode: ['Backspace', 'Delete'], defaultViewport: initialFlowViewport !== null && initialFlowViewport !== void 0 ? initialFlowViewport : DEFAULT_FLOW_VIEWPORT, minZoom: 0.5, maxZoom: 1.75, proOptions: { hideAttribution: true } },
-                React$2.createElement(Background, { gap: 24, size: 1.5, color: backgroundDotColor, bgColor: theme.palette.background.default }),
-                React$2.createElement(FlowViewportInitializer, { initialFlowViewport: initialFlowViewport }),
-                React$2.createElement(FlowZoomToolbar, { onResetRowLayout: handleResetRowLayout, onFlowViewportChange: onFlowViewportChange }),
-                React$2.createElement(FlowDisplayToolbar, { showBackwardArrows: showBackwardArrows, onShowBackwardArrowsChange: setShowBackwardArrows }))),
+    var handleControlOffsetDrag = useCallback$1(function (edgeId, offset) {
+        setFlowEdges(function (current) {
+            return current.map(function (edge) {
+                return edge.id === edgeId
+                    ? __assign(__assign({}, edge), { data: __assign(__assign({}, edge.data), { offsetX: offset.offsetX, offsetY: offset.offsetY }) }) : edge;
+            });
+        });
+    }, []);
+    var handleControlOffsetDragEnd = useCallback$1(function (edgeId, offset) {
+        var _a;
+        var parsed = parseTransitionEdgeId(edgeId);
+        if (!parsed) {
+            return;
+        }
+        onFlowEdgeLayoutChange(__assign(__assign({}, flowEdgeLayout), (_a = {}, _a[flowEdgeKey(parsed.sourceKey, parsed.targetKey)] = {
+            offsetX: offset.offsetX,
+            offsetY: offset.offsetY
+        }, _a)));
+    }, [flowEdgeLayout, onFlowEdgeLayoutChange]);
+    var edgeContextValue = useMemo$2(function () { return ({
+        onControlOffsetDrag: handleControlOffsetDrag,
+        onControlOffsetDragEnd: handleControlOffsetDragEnd
+    }); }, [handleControlOffsetDrag, handleControlOffsetDragEnd]);
+    return (React$2.createElement(WorkflowMoveEdgeContext.Provider, { value: edgeContextValue },
         React$2.createElement(Box, { sx: {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 1,
-                px: 1.5,
-                py: 1,
-                borderTop: 1,
+                border: 1,
                 borderColor: 'divider',
-                flexWrap: 'wrap'
+                borderRadius: 1.5,
+                bgcolor: 'background.default',
+                overflow: 'hidden'
             } },
-            React$2.createElement(Typography, { variant: "body2", color: "text.secondary" }, "Drag steps to move. Connect via the blue dots. Use Align row to snap steps horizontally."),
-            React$2.createElement(Button, { size: "small", startIcon: React$2.createElement(AddRoundedIcon, null), onClick: onAddStep }, "Add step"))));
+            React$2.createElement(Box, { className: "crafterwf-workflow-flow-canvas", onPointerDown: function (event) {
+                    // Prevent the scrollable dialog from hijacking canvas pan drags.
+                    event.stopPropagation();
+                }, sx: {
+                    height: { xs: 360, sm: 420 },
+                    maxHeight: 'min(50vh, 480px)',
+                    width: '100%',
+                    position: 'relative',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    '& .react-flow': {
+                        width: '100%',
+                        height: '100%',
+                        bgcolor: 'background.default'
+                    }
+                } },
+                React$2.createElement(index, { nodes: flowNodes, edges: flowEdges, nodeTypes: NODE_TYPES, edgeTypes: EDGE_TYPES, onNodesChange: handleNodesChange, onEdgesChange: handleEdgesChange, onNodeClick: function (_, node) { return onSelectStep(node.id); }, onNodeDragStart: handleNodeDragStart, onNodeDragStop: handleNodeDragStop, onConnect: handleConnect, onMoveEnd: handleMoveEnd, nodesConnectable: true, nodesDraggable: true, elementsSelectable: true, edgesFocusable: true, selectNodesOnDrag: false, panOnDrag: true, panOnScroll: true, panOnScrollMode: PanOnScrollMode.Free, panOnScrollSpeed: 0.75, panActivationKeyCode: "Space", zoomOnScroll: false, zoomOnPinch: true, connectionMode: ConnectionMode.Loose, connectionLineType: ConnectionLineType.Bezier, connectionRadius: 48, deleteKeyCode: ['Backspace', 'Delete'], defaultViewport: initialFlowViewport !== null && initialFlowViewport !== void 0 ? initialFlowViewport : DEFAULT_FLOW_VIEWPORT, minZoom: 0.5, maxZoom: 1.75, proOptions: { hideAttribution: true } },
+                    React$2.createElement(Background, { gap: 24, size: 1.5, color: backgroundDotColor, bgColor: theme.palette.background.default }),
+                    React$2.createElement(FlowViewportInitializer, { initialFlowViewport: initialFlowViewport }),
+                    React$2.createElement(FlowZoomToolbar, { onResetRowLayout: handleResetRowLayout, onFlowViewportChange: onFlowViewportChange }),
+                    React$2.createElement(FlowDisplayToolbar, { showBackwardArrows: showBackwardArrows, onShowBackwardArrowsChange: setShowBackwardArrows }))),
+            React$2.createElement(Box, { sx: {
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 1,
+                    px: 1.5,
+                    py: 1,
+                    borderTop: 1,
+                    borderColor: 'divider',
+                    flexWrap: 'wrap'
+                } },
+                React$2.createElement(Typography, { variant: "body2", color: "text.secondary" }, "Drag empty canvas to pan (or hold Space while dragging). Scroll wheel pans when zoom is off. Drag steps to move. Connect via the blue dots. Click a Move line, then drag the blue handle to reposition the curve midpoint (forward and backward lines). Press Delete to remove a selected Move line."),
+                React$2.createElement(Button, { size: "small", startIcon: React$2.createElement(AddRoundedIcon, null), onClick: onAddStep }, "Add step")))));
 }
 var WorkflowStepsFlowView = function (props) { return (React$2.createElement(ReactFlowProvider, null,
     React$2.createElement(FlowCanvas, __assign({}, props)))); };
@@ -30041,16 +30311,17 @@ var WorkflowEditorDialog = function (_a) {
     var _k = useState$1(BOARD_BACKGROUND_SWATCHES[0].id), boardBackground = _k[0], setBoardBackground = _k[1];
     var _l = useState$1([]), steps = _l[0], setSteps = _l[1];
     var _m = useState$1({}), flowLayout = _m[0], setFlowLayout = _m[1];
-    var _o = useState$1(DEFAULT_FLOW_VIEWPORT), flowViewport = _o[0], setFlowViewport = _o[1];
-    var _p = useState$1(null), initialFlowViewport = _p[0], setInitialFlowViewport = _p[1];
-    var _q = useState$1(null), selectedClientKey = _q[0], setSelectedClientKey = _q[1];
-    var _r = useState$1(false), stagingEnabled = _r[0], setStagingEnabled = _r[1];
-    var _s = useState$1(false), saving = _s[0], setSaving = _s[1];
-    var _t = useState$1(), error = _t[0], setError = _t[1];
-    var _u = useState$1(null), validationError = _u[0], setValidationError = _u[1];
-    var _v = useState$1(null), rulesStepIndex = _v[0], setRulesStepIndex = _v[1];
-    var _w = useState$1([]), createListeners = _w[0], setCreateListeners = _w[1];
-    var _x = useState$1([]), editListeners = _x[0], setEditListeners = _x[1];
+    var _o = useState$1({}), flowEdgeLayout = _o[0], setFlowEdgeLayout = _o[1];
+    var _p = useState$1(DEFAULT_FLOW_VIEWPORT), flowViewport = _p[0], setFlowViewport = _p[1];
+    var _q = useState$1(null), initialFlowViewport = _q[0], setInitialFlowViewport = _q[1];
+    var _r = useState$1(null), selectedClientKey = _r[0], setSelectedClientKey = _r[1];
+    var _s = useState$1(false), stagingEnabled = _s[0], setStagingEnabled = _s[1];
+    var _t = useState$1(false), saving = _t[0], setSaving = _t[1];
+    var _u = useState$1(), error = _u[0], setError = _u[1];
+    var _v = useState$1(null), validationError = _v[0], setValidationError = _v[1];
+    var _w = useState$1(null), rulesStepIndex = _w[0], setRulesStepIndex = _w[1];
+    var _x = useState$1([]), createListeners = _x[0], setCreateListeners = _x[1];
+    var _y = useState$1([]), editListeners = _y[0], setEditListeners = _y[1];
     var stepSettingsRef = useRef$1(null);
     var selectedStepIndex = useMemo$2(function () { return (selectedClientKey ? steps.findIndex(function (step) { return step.clientKey === selectedClientKey; }) : -1); }, [selectedClientKey, steps]);
     useEffect$2(function () {
@@ -30065,6 +30336,7 @@ var WorkflowEditorDialog = function (_a) {
             setSteps(mappedSteps);
             var loadedLayout = mapFlowLayoutToClientKeys(detail.workflow.flowLayout, mappedSteps);
             setFlowLayout(__assign(__assign({}, buildDefaultRowLayout(mappedSteps)), loadedLayout));
+            setFlowEdgeLayout(mapFlowEdgeLayoutToClientKeys(detail.workflow.flowEdgeLayout, mappedSteps));
             var loadedViewport = (_a = normalizeFlowViewport(detail.workflow.flowViewport)) !== null && _a !== void 0 ? _a : DEFAULT_FLOW_VIEWPORT;
             setFlowViewport(loadedViewport);
             setInitialFlowViewport(loadedViewport);
@@ -30103,20 +30375,38 @@ var WorkflowEditorDialog = function (_a) {
     var handleFlowViewportChange = function (viewport) {
         setFlowViewport(viewport);
     };
+    var handleFlowEdgeLayoutChange = function (layout) {
+        setFlowEdgeLayout(layout);
+    };
     var handleTransitionChange = function (sourceClientKey, targetClientKeys) {
         setSteps(function (current) {
             return current.map(function (step) {
                 return step.clientKey === sourceClientKey ? __assign(__assign({}, step), { transitionStepClientKeys: targetClientKeys }) : step;
             });
         });
+        setFlowEdgeLayout(function (current) {
+            var allowed = new Set(targetClientKeys.map(function (targetKey) { return flowEdgeKey(sourceClientKey, targetKey); }));
+            var next = {};
+            Object.entries(current).forEach(function (_a) {
+                var key = _a[0], value = _a[1];
+                var parsed = parseFlowEdgeKey(key);
+                if (!parsed) {
+                    return;
+                }
+                if (parsed.sourceKey === sourceClientKey && !allowed.has(key)) {
+                    return;
+                }
+                next[key] = value;
+            });
+            return next;
+        });
     };
     var handleAddStep = function () {
         var clientKey = "new-".concat(Date.now(), "-").concat(Math.random());
-        steps.length;
-        var nextLayout = buildDefaultRowLayout(__spreadArray(__spreadArray([], steps, true), [
-            { clientKey: clientKey, name: 'New Step' }
-        ], false));
-        setFlowLayout(nextLayout);
+        setFlowLayout(function (current) {
+            var _a;
+            return (__assign(__assign({}, current), (_a = {}, _a[clientKey] = positionForAddedStep(steps, current), _a)));
+        });
         setSteps(__spreadArray(__spreadArray([], steps, true), [
             {
                 clientKey: clientKey,
@@ -30150,6 +30440,7 @@ var WorkflowEditorDialog = function (_a) {
             delete next[removedKey];
             return next;
         });
+        setFlowEdgeLayout(function (current) { return pruneFlowEdgeLayout(current, removedKey); });
         setSteps(nextSteps);
         if (selectedClientKey === removedKey) {
             setSelectedClientKey((_b = (_a = nextSteps[Math.min(index, nextSteps.length - 1)]) === null || _a === void 0 ? void 0 : _a.clientKey) !== null && _b !== void 0 ? _b : null);
@@ -30161,6 +30452,10 @@ var WorkflowEditorDialog = function (_a) {
     var handleActionTypeChange = function (index, actionType) {
         var patch = { actionType: actionType };
         if (actionType === STEP_ACTION_NONE) {
+            patch.actionSuccessStepClientKey = undefined;
+            patch.actionSuccessStepId = undefined;
+        }
+        else if (actionType === STEP_ACTION_ARCHIVE_PACKAGE) {
             patch.actionSuccessStepClientKey = undefined;
             patch.actionSuccessStepId = undefined;
         }
@@ -30201,7 +30496,7 @@ var WorkflowEditorDialog = function (_a) {
         setSaving(true);
         setError(undefined);
         saveWorkflowDefinition(siteId, detail.workflow.id, {
-            workflow: __assign(__assign({}, detail.workflow), { name: name.trim(), description: description.trim(), backgroundColor: boardBackground, bypassWarningMessage: bypassWarningMessage.trim(), allowUiBypass: allowUiBypass, flowLayout: mapFlowLayoutToStepIds(flowLayout, steps), flowViewport: flowViewport }),
+            workflow: __assign(__assign({}, detail.workflow), { name: name.trim(), description: description.trim(), backgroundColor: boardBackground, bypassWarningMessage: bypassWarningMessage.trim(), allowUiBypass: allowUiBypass, flowLayout: mapFlowLayoutToStepIds(flowLayout, steps), flowEdgeLayout: mapFlowEdgeLayoutToStepIds(flowEdgeLayout, steps), flowViewport: flowViewport }),
             createListeners: createListeners.map(function (listener) {
                 var _a, _b;
                 return ({
@@ -30285,7 +30580,7 @@ var WorkflowEditorDialog = function (_a) {
                 } },
                 React$2.createElement(Typography, { variant: "subtitle1", fontWeight: 600, gutterBottom: true }, "Workflow flow"),
                 React$2.createElement(Typography, { variant: "body2", color: "text.secondary", sx: { mb: 1 } }, "Drag steps to move them. Use the toolbar to zoom. Connect steps with the blue dots on each card."),
-                React$2.createElement(WorkflowStepsFlowView, { steps: steps, flowLayout: flowLayout, initialFlowViewport: initialFlowViewport, selectedClientKey: selectedClientKey, onSelectStep: handleSelectStep, onFlowLayoutChange: handleFlowLayoutChange, onFlowViewportChange: handleFlowViewportChange, onTransitionChange: handleTransitionChange, onAddStep: handleAddStep })),
+                React$2.createElement(WorkflowStepsFlowView, { steps: steps, flowLayout: flowLayout, flowEdgeLayout: flowEdgeLayout, initialFlowViewport: initialFlowViewport, selectedClientKey: selectedClientKey, onSelectStep: handleSelectStep, onFlowLayoutChange: handleFlowLayoutChange, onFlowEdgeLayoutChange: handleFlowEdgeLayoutChange, onFlowViewportChange: handleFlowViewportChange, onTransitionChange: handleTransitionChange, onAddStep: handleAddStep })),
             React$2.createElement(Box, { sx: { px: 3, py: 2, pb: 4 } },
                 React$2.createElement(Stack, { spacing: 2 },
                     validationError && (React$2.createElement(Alert, { severity: "warning", onClose: function () { return setValidationError(null); } }, validationError)),
@@ -30322,11 +30617,14 @@ var WorkflowEditorDialog = function (_a) {
                             React$2.createElement(RadioGroup, { value: selectedStep.actionType || STEP_ACTION_NONE, onChange: function (event) {
                                     return handleActionTypeChange(selectedStepIndex, event.target.value);
                                 } },
-                                React$2.createElement(FormControlLabel, { value: STEP_ACTION_NONE, control: React$2.createElement(Radio, { size: "small" }), label: "No publish action" }),
+                                React$2.createElement(FormControlLabel, { value: STEP_ACTION_NONE, control: React$2.createElement(Radio, { size: "small" }), label: "No Action" }),
                                 React$2.createElement(FormControl, { component: "fieldset", variant: "standard", sx: { mt: 0.5 } },
                                     React$2.createElement(FormLabel, { component: "legend", sx: { typography: 'caption', color: 'text.secondary' } }, "Publish action (arrow to next step on success)"),
-                                    React$2.createElement(Box, { sx: { display: 'flex', flexWrap: 'wrap', gap: 0.5, pl: 0.5, pt: 0.25 } }, PUBLISH_ACTION_OPTIONS.map(function (option) { return (React$2.createElement(FormControlLabel, { key: option.value, value: option.value, control: React$2.createElement(Radio, { size: "small" }), label: option.label, disabled: option.requiresStaging && !stagingEnabled, sx: { mr: 1.5 } })); })))),
-                            React$2.createElement(FormControl, { size: "small", sx: { maxWidth: 360 }, disabled: !selectedStep.actionType || selectedStep.actionType === STEP_ACTION_NONE },
+                                    React$2.createElement(Box, { sx: { display: 'flex', flexWrap: 'wrap', gap: 0.5, pl: 0.5, pt: 0.25 } }, PUBLISH_ACTION_OPTIONS.map(function (option) { return (React$2.createElement(FormControlLabel, { key: option.value, value: option.value, control: React$2.createElement(Radio, { size: "small" }), label: option.label, disabled: option.requiresStaging && !stagingEnabled, sx: { mr: 1.5 } })); }))),
+                                React$2.createElement(FormControl, { component: "fieldset", variant: "standard", sx: { mt: 1 } },
+                                    React$2.createElement(FormLabel, { component: "legend", sx: { typography: 'caption', color: 'text.secondary' } }, "Other automated actions"),
+                                    React$2.createElement(Box, { sx: { display: 'flex', flexWrap: 'wrap', gap: 0.5, pl: 0.5, pt: 0.25 } }, ARCHIVE_ACTION_OPTIONS.map(function (option) { return (React$2.createElement(FormControlLabel, { key: option.value, value: option.value, control: React$2.createElement(Radio, { size: "small" }), label: option.label, sx: { mr: 1.5 } })); })))),
+                            isArchiveStepAction(selectedStep.actionType) ? (React$2.createElement(Typography, { variant: "body2", color: "text.secondary", sx: { maxWidth: 420 } }, "Archiving removes the package from the board. It is no longer in the workflow \u2014 no success step is used.")) : (React$2.createElement(FormControl, { size: "small", sx: { maxWidth: 360 }, disabled: !selectedStep.actionType || selectedStep.actionType === STEP_ACTION_NONE },
                                 React$2.createElement(InputLabel, { id: "success-step-label-".concat(selectedStep.clientKey) }, "Step on success"),
                                 React$2.createElement(Select, { labelId: "success-step-label-".concat(selectedStep.clientKey), label: "Step on success", value: selectedStep.actionSuccessStepClientKey ||
                                         selectedStep.actionSuccessStepId ||
@@ -30351,7 +30649,7 @@ var WorkflowEditorDialog = function (_a) {
                                         .map(function (candidate) {
                                         var _a;
                                         return (React$2.createElement(MenuItem, { key: candidate.clientKey, value: candidate.clientKey }, ((_a = candidate.name) === null || _a === void 0 ? void 0 : _a.trim()) || 'Untitled step'));
-                                    })))))) : (React$2.createElement(Typography, { variant: "body2", color: "text.secondary" }, "Click a step in the flow canvas above to edit its settings.")),
+                                    }))))))) : (React$2.createElement(Typography, { variant: "body2", color: "text.secondary" }, "Click a step in the flow canvas above to edit its settings.")),
                     React$2.createElement(Accordion, { disableGutters: true, elevation: 0, sx: { border: 1, borderColor: 'divider', borderRadius: 1 } },
                         React$2.createElement(AccordionSummary, { expandIcon: React$2.createElement(ExpandMoreRoundedIcon, null) },
                             React$2.createElement(Typography, { variant: "subtitle2", fontWeight: 600 }, "Content event listeners")),

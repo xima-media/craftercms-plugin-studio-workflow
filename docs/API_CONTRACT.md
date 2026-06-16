@@ -441,7 +441,7 @@ POST body: `{ siteId, workflowId, workflow, steps }`.
 
 **`workflow` fields (root):** `id`, `name`, `description`, `backgroundUrl`, `position`, `isDefault`, `allowUiBypass`, `bypassWarningMessage`, `createListeners`, `editListeners`.
 
-**Each `steps[]` entry:** `id`, `name`, `position`, `color`, `isTerminal`, `allowAddPackage`, **`actionType`** (`none` \| `request_publish_staging` \| `request_publish_live` \| `publish_staging` \| `publish_live`), **`actionSuccessStepId`**, `roleRule`, `contentRule`.
+**Each `steps[]` entry:** `id`, `name`, `position`, `color`, `isTerminal`, `allowAddPackage`, **`actionType`** (`none` \| `request_publish_staging` \| `request_publish_live` \| `publish_staging` \| `publish_live` \| `archive_package`), **`actionSuccessStepId`** (publish actions only), `roleRule`, `contentRule`.
 
 See [WORKFLOW_DEFINITIONS.md](./WORKFLOW_DEFINITIONS.md) for field semantics and [WORKFLOW_BYPASS_GUARD.md](./WORKFLOW_BYPASS_GUARD.md) for `allowUiBypass`.
 

@@ -27,6 +27,8 @@ function buildCriticalReactFlowCss(canvasBg: string, nodeBg: string, handleBorde
 .crafterwf-workflow-flow-canvas .react-flow__pane {
   z-index: 1 !important;
   touch-action: none;
+  pointer-events: all !important;
+  cursor: grab;
 }
 .crafterwf-workflow-flow-canvas .react-flow__pane.draggable {
   cursor: grab;
@@ -42,9 +44,7 @@ function buildCriticalReactFlowCss(canvasBg: string, nodeBg: string, handleBorde
 .crafterwf-workflow-flow-canvas .react-flow__renderer {
   position: relative;
   z-index: 4 !important;
-  pointer-events: none !important;
-  width: 100%;
-  height: 100%;
+  touch-action: none;
 }
 .crafterwf-workflow-flow-canvas .react-flow__nodes {
   pointer-events: none !important;
@@ -83,6 +83,34 @@ function buildCriticalReactFlowCss(canvasBg: string, nodeBg: string, handleBorde
 .crafterwf-workflow-flow-canvas .react-flow__handle.connectingfrom {
   pointer-events: all !important;
   cursor: crosshair;
+}
+.crafterwf-workflow-flow-canvas .react-flow__edges {
+  pointer-events: none !important;
+  z-index: 5 !important;
+}
+.crafterwf-workflow-flow-canvas .react-flow__edges svg {
+  pointer-events: none !important;
+  overflow: visible !important;
+}
+.crafterwf-workflow-flow-canvas .react-flow__edges svg g.react-flow__edge {
+  pointer-events: all !important;
+}
+.crafterwf-workflow-flow-canvas .react-flow__edge.selectable {
+  cursor: pointer;
+}
+.crafterwf-workflow-flow-canvas .react-flow__edge-interaction {
+  pointer-events: stroke !important;
+  cursor: pointer;
+}
+.crafterwf-workflow-flow-canvas .react-flow__edge-textwrapper {
+  pointer-events: all !important;
+  cursor: pointer;
+}
+.crafterwf-workflow-flow-canvas .react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3.5px !important;
+}
+.crafterwf-workflow-flow-canvas .crafterwf-workflow-edge-handle {
+  pointer-events: all !important;
 }
 .crafterwf-workflow-flow-canvas .react-flow__edge-path {
   stroke-width: 2.5px;

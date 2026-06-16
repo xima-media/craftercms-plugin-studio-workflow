@@ -26,3 +26,5 @@ export declare function evaluateStepMove(roleRule: StepRoleRule | undefined, con
     allowed: boolean;
     message?: string;
 };
+export declare function hasConfiguredRoleRule(rule?: StepRoleRule): boolean;
+export declare function hasConfiguredContentRule(rule?: StepContentRule): boolean;

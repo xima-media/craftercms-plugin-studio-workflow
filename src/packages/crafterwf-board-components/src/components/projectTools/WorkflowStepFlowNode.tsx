@@ -4,6 +4,7 @@ import { type NodeProps } from '@xyflow/react';
 import { Chip, Typography, useTheme } from '@mui/material';
 
 import { resolveStepColor } from '../../colors';
+import { getStepActionLabel, hasStepAction } from '../../stepActions';
 import { Position, WorkflowFlowHandle } from './workflowFlowHandle';
 
 export interface WorkflowStepFlowNodeData extends Record<string, unknown> {
@@ -12,6 +13,9 @@ export interface WorkflowStepFlowNodeData extends Record<string, unknown> {
   isTerminal: boolean;
   allowAddPackage: boolean;
   selected: boolean;
+  actionType?: string;
+  hasRoleRules: boolean;
+  hasContentRules: boolean;
 }
 
 export const WORKFLOW_STEP_NODE_WIDTH = 340;
@@ -22,6 +26,7 @@ const WorkflowStepFlowNode = ({ data, selected }: NodeProps) => {
   const stepData = data as WorkflowStepFlowNodeData;
   const stepColor = resolveStepColor(stepData.color);
   const isSelected = selected || stepData.selected;
+  const actionLabel = hasStepAction(stepData.actionType) ? getStepActionLabel(stepData.actionType) : null;
 
   const handleStyle: React.CSSProperties = {
     width: 20,
@@ -62,6 +67,21 @@ const WorkflowStepFlowNode = ({ data, selected }: NodeProps) => {
           ) : null}
           {stepData.allowAddPackage ? (
             <Chip label="+ Package" size="medium" sx={{ height: 28, fontSize: '0.8rem' }} />
+          ) : null}
+          {actionLabel ? (
+            <Chip
+              label={actionLabel}
+              size="medium"
+              color="primary"
+              variant="outlined"
+              sx={{ height: 28, fontSize: '0.8rem' }}
+            />
+          ) : null}
+          {stepData.hasRoleRules ? (
+            <Chip label="Role rules" size="medium" variant="outlined" sx={{ height: 28, fontSize: '0.8rem' }} />
+          ) : null}
+          {stepData.hasContentRules ? (
+            <Chip label="Content rules" size="medium" variant="outlined" sx={{ height: 28, fontSize: '0.8rem' }} />
           ) : null}
         </div>
       </div>

@@ -6,6 +6,9 @@ export interface WorkflowStepFlowNodeData extends Record<string, unknown> {
     isTerminal: boolean;
     allowAddPackage: boolean;
     selected: boolean;
+    actionType?: string;
+    hasRoleRules: boolean;
+    hasContentRules: boolean;
 }
 export declare const WORKFLOW_STEP_NODE_WIDTH = 340;
 export declare const WORKFLOW_STEP_NODE_HEIGHT = 140;

@@ -140,7 +140,7 @@ class WorkflowBypassService {
         if (!definition) {
             return null
         }
-        def actionStepIds = WorkflowDefinitionSupport.actionStepIds(definition)
+        def actionStepIds = WorkflowDefinitionSupport.publishActionStepIds(definition)
         if (!actionStepIds) {
             return null
         }

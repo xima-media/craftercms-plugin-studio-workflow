@@ -28,7 +28,7 @@ Record **who** did **what**, to **which target**, **when**, with an optional hum
 | `task_modified` | `task` | Task updated, completed/reopened, or archived/restored |
 | `package_created` | `package` | WorkflowPackage created |
 | `package_step_changed` | `package` | Package moved to a **different** WorkflowStep (reorder within same step is not logged) |
-| `package_modified` | `package` | Title, description, due date, or attachment changes |
+| `package_modified` | `package` | Title, description, due date, attachment changes, or **package archived** (manual or automated) |
 | `package_step_action` | `package` | Automated publish/review step action ran (success or failure) |
 | `workflow_bypass_acknowledged` | `package` | User acknowledged bypass warning before Studio publish/reject |
 | `workflow_bypass_action` | `package` | User completed Studio publish/reject outside workflow step |

@@ -43,6 +43,9 @@ class WorkflowDefinitionSupport {
             flowLayout            : definition.flowLayout instanceof Map
                 ? new LinkedHashMap(definition.flowLayout)
                 : (definition.flowLayout ?: [:]),
+            flowEdgeLayout        : definition.flowEdgeLayout instanceof Map
+                ? new LinkedHashMap(definition.flowEdgeLayout)
+                : (definition.flowEdgeLayout ?: [:]),
             flowViewport          : definition.flowViewport instanceof Map
                 ? new LinkedHashMap(definition.flowViewport)
                 : (definition.flowViewport ?: null)
@@ -59,6 +62,18 @@ class WorkflowDefinitionSupport {
         sortedSteps(definition).each { step ->
             def actionType = resolveActionType(step)
             if (StepActionType.isActionStep(actionType)) {
+                ids << (step.id as String)
+            }
+        }
+        return ids.toList()
+    }
+
+    /** Steps whose automated action is publish/review (used by the Studio bypass guard). */
+    static List<String> publishActionStepIds(Map definition) {
+        def ids = [] as LinkedHashSet
+        sortedSteps(definition).each { step ->
+            def actionType = resolveActionType(step)
+            if (StepActionType.isPublishAction(actionType)) {
                 ids << (step.id as String)
             }
         }

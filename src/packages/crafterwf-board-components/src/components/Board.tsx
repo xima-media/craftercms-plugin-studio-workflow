@@ -44,7 +44,7 @@ import { CONTENT_RULE_BLOCKED_MESSAGE } from '../stepRules';
 import { resolveBoardBackgroundColor, resolveStepColor } from '../colors';
 import { notifyWorkflowsUpdated } from '../utils/activeWorkflows';
 import { showStudioErrorSnack } from '../utils/showStudioErrorSnack';
-import { getStepActionDescriptions, getStepActionLabel, hasPublishStepAction } from '../stepActions';
+import { getStepActionDescriptions, getStepActionLabel, hasStepAction, isArchiveStepAction } from '../stepActions';
 
 export interface BoardProps {
   /** Widget config may still pass boardId; treated as workflowId */
@@ -63,6 +63,7 @@ interface PendingStepActionMove {
   cardName: string;
   stepName: string;
   actionLabel: string;
+  isArchiveAction?: boolean;
 }
 
 type BoardLists = NonNullable<BoardView['lists']>;
@@ -192,7 +193,7 @@ const Board = ({ boardId, workflowId: workflowIdProp, openPackageId: initialOpen
       sourceListId !== targetListId &&
       targetList &&
       card &&
-      hasPublishStepAction(targetList.actionType)
+      hasStepAction(targetList.actionType)
     ) {
       const actionLabel = getStepActionLabel(targetList.actionType);
       if (actionLabel && state.lists) {
@@ -214,7 +215,8 @@ const Board = ({ boardId, workflowId: workflowIdProp, openPackageId: initialOpen
           targetIndex: targetListIdIndex,
           cardName: card.name,
           stepName: targetList.name,
-          actionLabel
+          actionLabel,
+          isArchiveAction: isArchiveStepAction(targetList.actionType)
         });
         return;
       }
@@ -571,7 +573,7 @@ const Board = ({ boardId, workflowId: workflowIdProp, openPackageId: initialOpen
                     >
                       {list.name}
                     </Typography>
-                    {hasPublishStepAction(list.actionType) && (
+                    {hasStepAction(list.actionType) && (
                       <Tooltip
                         arrow
                         placement="top"
@@ -753,7 +755,10 @@ const Board = ({ boardId, workflowId: workflowIdProp, openPackageId: initialOpen
           <Typography variant="body1" sx={{ mt: 0.5 }}>
             Moving <strong>{pendingStepActionMove?.cardName}</strong> to{' '}
             <strong>{pendingStepActionMove?.stepName}</strong> will automatically perform{' '}
-            <strong>{pendingStepActionMove?.actionLabel}</strong> on the package&apos;s attached content.
+            <strong>{pendingStepActionMove?.actionLabel}</strong>
+            {pendingStepActionMove?.isArchiveAction
+              ? '. The package will be removed from the board.'
+              : ' on the package\u2019s attached content.'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
             Do you want to continue?
