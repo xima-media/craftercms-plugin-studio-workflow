@@ -1,0 +1,8 @@
+services:
+  webtools:
+    image: docker-ot.artifactory.xima-services.de/node-webtools:2.5.0
+    working_dir: /opt/project
+    volumes:
+    -  .:/opt/project
+    stdin_open: true
+    tty: true
