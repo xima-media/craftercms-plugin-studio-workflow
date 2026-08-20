@@ -29672,10 +29672,12 @@ function parseFlowEdgeKey(key) {
     if (splitAt <= 0) {
         return null;
     }
-    return {
-        sourceKey: key.slice(0, splitAt),
-        targetKey: key.slice(splitAt + 2)
-    };
+    var sourceKey = key.slice(0, splitAt);
+    var targetKey = key.slice(splitAt + 2);
+    if (!sourceKey || !targetKey) {
+        return null;
+    }
+    return { sourceKey: sourceKey, targetKey: targetKey };
 }
 function edgeMidpoint(sourceX, sourceY, targetX, targetY) {
     return {
@@ -29802,12 +29804,23 @@ var WorkflowMoveEdge = function (_a) {
     var edgeContext = useContext(WorkflowMoveEdgeContext);
     var edgeData = data;
     var latestOffsetRef = useRef$1(resolveOffset(edgeData, sourceX, sourceY, targetX, targetY));
+    var dragCleanupRef = useRef$1(null);
     var offset = resolveOffset(edgeData, sourceX, sourceY, targetX, targetY);
     latestOffsetRef.current = offset;
+    useEffect$2(function () {
+        return function () {
+            var _a;
+            (_a = dragCleanupRef.current) === null || _a === void 0 ? void 0 : _a.call(dragCleanupRef);
+            dragCleanupRef.current = null;
+        };
+    }, []);
     var _b = buildQuadraticBezierPath(sourceX, sourceY, targetX, targetY, offset), path = _b.path, handleX = _b.handleX, handleY = _b.handleY, labelX = _b.labelX, labelY = _b.labelY;
     var handlePointerDown = useCallback$1(function (event) {
+        var _a;
         event.stopPropagation();
         event.preventDefault();
+        (_a = dragCleanupRef.current) === null || _a === void 0 ? void 0 : _a.call(dragCleanupRef);
+        var cleanedUp = false;
         var applyOffset = function (handleXPos, handleYPos) {
             var next = computeControlOffsetFromHandle(sourceX, sourceY, targetX, targetY, handleXPos, handleYPos);
             latestOffsetRef.current = next;
@@ -29818,13 +29831,24 @@ var WorkflowMoveEdge = function (_a) {
             var flow = screenToFlowPosition({ x: moveEvent.clientX, y: moveEvent.clientY });
             applyOffset(flow.x, flow.y);
         };
-        var onPointerUp = function () {
-            edgeContext === null || edgeContext === void 0 ? void 0 : edgeContext.onControlOffsetDragEnd(id, latestOffsetRef.current);
+        var cleanup = function () {
+            if (cleanedUp) {
+                return;
+            }
+            cleanedUp = true;
             window.removeEventListener('pointermove', onPointerMove);
             window.removeEventListener('pointerup', onPointerUp);
+            if (dragCleanupRef.current === cleanup) {
+                dragCleanupRef.current = null;
+            }
+        };
+        var onPointerUp = function () {
+            edgeContext === null || edgeContext === void 0 ? void 0 : edgeContext.onControlOffsetDragEnd(id, latestOffsetRef.current);
+            cleanup();
         };
         window.addEventListener('pointermove', onPointerMove);
         window.addEventListener('pointerup', onPointerUp);
+        dragCleanupRef.current = cleanup;
     }, [edgeContext, id, screenToFlowPosition, sourceX, sourceY, targetX, targetY]);
     return (React$2.createElement(React$2.Fragment, null,
         React$2.createElement(BaseEdge, { id: id, path: path, markerEnd: markerEnd, style: style, label: label, labelStyle: labelStyle, labelBgStyle: labelBgStyle, labelBgPadding: labelBgPadding, labelBgBorderRadius: labelBgBorderRadius, labelX: labelX, labelY: labelY, interactionWidth: WORKFLOW_EDGE_INTERACTION_WIDTH }),

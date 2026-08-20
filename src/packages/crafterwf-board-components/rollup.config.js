@@ -53,7 +53,9 @@ module.exports = {
       'process.env.NODE_ENV': JSON.stringify('production')
     }),
     typescript({
-      tsconfigOverride: { compilerOptions: { declaration: true } }
+      // The bundle is loaded by Studio, not consumed as a library, so the .d.ts files would only end
+      // up as noise in the deployed static-assets tree.
+      tsconfigOverride: { compilerOptions: { declaration: false } }
     }),
     replaceImportsWithVars({
       replacementLookup: globals,

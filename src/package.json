@@ -9,8 +9,7 @@
   "packageManager": "yarn@3.2.2",
   "workspaces": [
     "packages/crafterwf-board-components",
-    "packages/crafterwf-app",
-    "packages/cra"
+    "packages/crafterwf-app"
   ],
   "scripts": {
     "w:prettier": "yarn prettier --write './packages/**/*.{ts,tsx}'",
