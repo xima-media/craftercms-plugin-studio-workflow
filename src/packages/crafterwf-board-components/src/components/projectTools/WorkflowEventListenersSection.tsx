@@ -161,15 +161,10 @@ const WorkflowEventListenersSection = ({
 
   return (
     <Stack spacing={1.5} sx={{ flexShrink: 0 }}>
-      <Box>
-        <Typography variant="subtitle1" fontWeight={600}>
-          Content event listeners
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          On matching create or edit events, attach content to a package (created when needed) and move it to the
-          selected step. If no Edit listeners are configured, Create listeners also run when content is saved.
-        </Typography>
-      </Box>
+      <Typography variant="body2" color="text.secondary">
+        On matching create or edit events, attach content to a package (created when needed) and move it to the
+        selected step. If no Edit listeners are configured, Create listeners also run when content is saved.
+      </Typography>
 
       <Tabs value={tab} onChange={(_, value: WorkflowEventListenerKind) => setTab(value)}>
         <Tab value="create" label={`Create (${createListeners.length})`} />

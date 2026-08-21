@@ -209,7 +209,7 @@ gemeinsamen Abschnitte 1,5 bis 3 h, Review und Sichtprüfung 1 bis 2 h.
 
 ## BUG-008
 
-- [ ] Inhalt der Box "Content event listeners" klebt am Rahmen
+- [x] Inhalt der Box "Content event listeners" klebt am Rahmen
 
 `AccordionDetails` wird mit `px: 0` gerendert (`WorkflowEditorDialog.tsx:740`), der umgebende
 `Accordion` hat aber einen sichtbaren Rahmen (`:734`). Dadurch laufen Beschreibungstext, Tabs und die

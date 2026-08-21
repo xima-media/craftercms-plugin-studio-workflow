@@ -513,7 +513,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
 
               <Accordion disableGutters elevation={0} sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
                 <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
-                  <Typography variant="subtitle2" fontWeight={600}>
+                  <Typography variant="subtitle1" fontWeight={600}>
                     Workflow details &amp; guard settings
                   </Typography>
                 </AccordionSummary>
@@ -556,8 +556,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
                     borderColor: 'primary.main',
                     borderRadius: 1.5,
                     bgcolor: 'background.paper',
-                    px: 2.5,
-                    py: 2
+                    p: 2
                   }}
                 >
                   <Stack spacing={2}>
@@ -733,11 +732,11 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
 
               <Accordion disableGutters elevation={0} sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
                 <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
-                  <Typography variant="subtitle2" fontWeight={600}>
+                  <Typography variant="subtitle1" fontWeight={600}>
                     Content event listeners
                   </Typography>
                 </AccordionSummary>
-                <AccordionDetails sx={{ px: 0 }}>
+                <AccordionDetails>
                   <WorkflowEventListenersSection
                     steps={steps}
                     createListeners={createListeners}

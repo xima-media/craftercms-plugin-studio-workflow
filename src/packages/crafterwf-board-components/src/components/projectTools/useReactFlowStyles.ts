@@ -63,6 +63,7 @@ function buildCriticalReactFlowCss(canvasBg: string, nodeBg: string, handleBorde
   opacity: 1 !important;
 }
 .crafterwf-workflow-flow-canvas .react-flow__panel {
+  margin: 16px;
   z-index: 10 !important;
   pointer-events: all !important;
 }

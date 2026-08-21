@@ -716,7 +716,7 @@ function FlowCanvas({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 1,
-          px: 1.5,
+          px: 2,
           py: 1,
           borderTop: 1,
           borderColor: 'divider',
