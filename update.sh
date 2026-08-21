@@ -69,16 +69,9 @@ authoring_folders=(content-types scripts static-assets)
 copy_tier authoring "$authoring_target" "${authoring_folders[@]}"
 copy_tier delivery "$site_dir" scripts static-assets templates
 
-# Studio reads a file through its content repository, and that takes the blob from the last commit of
-# the sandbox repository, not from the working tree (GitContentRepository.getContentFromGit via
-# getTreeForLastCommit). A copied file therefore stays invisible to Studio until it is committed, and
-# no endpoint can help, because it is the source and not a cache that is stale. Only the authoring
-# tier needs this: Engine runs with crafter.engine.store.type=filesystem and reads the delivery tier
-# straight from the working tree. Groovy under scripts/ would work uncommitted as well, it goes along
-# so that a later checkout in the site repository cannot silently drop it.
-#
-# Only the authoring folders are staged, so unrelated work in the site's working tree stays
-# untouched. The pathspec on commit keeps anything else that was already staged out of this commit.
+# Studio reads the authoring tier from the last commit of the sandbox repository, not from the
+# working tree, so a copy stays invisible until it is committed. Delivery needs none, Engine reads it
+# from the file system. Staging only the copied folders leaves the rest of the site untouched.
 commit_paths=()
 for folder in "${authoring_folders[@]}"; do
   [ -d "$authoring_target/$folder" ] && commit_paths+=("$authoring_target/$folder")
