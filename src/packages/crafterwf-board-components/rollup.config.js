@@ -62,7 +62,7 @@ module.exports = {
       replacementRegExps
     }),
     // !!: If used, terser should be after `replaceImportsWithVars`
-    //terser(),
+    terser(),
     resolve({ extensions }),
     commonjs(),
     // Zustand (via @xyflow/react) uses import.meta.env — invalid in Studio's plugin script loader.
