@@ -76,8 +76,8 @@ docker compose run --rm --workdir /opt/project/src webtools node .yarn/releases/
 ```
 
 Wurde am Frontend nichts geändert, genügt `./update.sh` allein. Es transportiert nur: es kopiert die
-von Studio verarbeiteten Ordner des Tiers nach `config/studio` der Site und lädt Studios
-Groovy-Engine neu. Damit sind Groovy-Klassen, REST-Scripts und das Bundle abgedeckt, mehr nicht.
+von Studio verarbeiteten Ordner des Tiers nach `config/studio` der Site, commitet sie im Site-Repo,
+weil Studio sie aus dem letzten Commit liest, und lädt Studios Groovy-Engine neu. Damit sind Groovy-Klassen, REST-Scripts und das Bundle abgedeckt, mehr nicht.
 
 Nicht abgedeckt und jeweils ein eigener Schritt:
 
