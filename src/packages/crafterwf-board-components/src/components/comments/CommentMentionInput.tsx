@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Box,
@@ -14,7 +14,7 @@ import {
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 
 import { getMentionQuery, MentionUserRef, parseCommentDraftSegments } from '../../utils/mentionUtils';
-import { UserAvatarLabel, userDisplayName } from '../users/studioUserDisplay';
+import { UserAvatarLabel } from '../users/studioUserDisplay';
 
 export interface MentionUserOption extends MentionUserRef {
   label: string;
@@ -35,19 +35,24 @@ const INPUT_FONT_SIZE = '0.875rem';
 const INPUT_LINE_HEIGHT = 1.43;
 const INPUT_PADDING = '8.5px 36px 8.5px 14px';
 
+const mentionOptionId = (userId: number) => `crafterwf-mention-option-${userId}`;
+
+/**
+ * Renders one draft segment for the mirror box. Every segment must occupy exactly the characters and
+ * the glyph widths of the raw textarea text, otherwise the caret drifts away from the visible text:
+ * hence the raw `@username` instead of a display name, and highlighting without a weight change.
+ */
 function renderDraftSegment(segment: ReturnType<typeof parseCommentDraftSegments>[number], key: number) {
   if (segment.type === 'mention') {
-    const label = segment.user ? userDisplayName(segment.user) : `@${segment.username}`;
     return (
       <Box
         key={key}
         component="span"
         sx={{
-          fontWeight: 700,
           color: 'primary.main'
         }}
       >
-        {label}
+        {`@${segment.username}`}
       </Box>
     );
   }
@@ -57,7 +62,6 @@ function renderDraftSegment(segment: ReturnType<typeof parseCommentDraftSegments
         key={key}
         component="span"
         sx={{
-          fontWeight: 600,
           color: 'primary.main',
           bgcolor: 'action.selected',
           borderRadius: 0.5
@@ -84,9 +88,11 @@ const CommentMentionInput = ({
   const [mentionQuery, setMentionQuery] = useState('');
   const [cursorPosition, setCursorPosition] = useState(0);
   const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const mirrorRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const activeOptionRef = useRef<HTMLDivElement | null>(null);
 
   const minHeight = minRows * INPUT_LINE_HEIGHT * 16 + 17;
   const maxHeight = maxRows * INPUT_LINE_HEIGHT * 16 + 17;
@@ -102,6 +108,19 @@ const CommentMentionInput = ({
       )
       .slice(0, 8);
   }, [mentionQuery, mentionUsers]);
+
+  const activeMentionUser = filteredMentionUsers[activeIndex] ?? filteredMentionUsers[0];
+
+  // The highlight would otherwise point at whatever moved into its slot while the query narrows down.
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [filteredMentionUsers]);
+
+  useEffect(() => {
+    if (mentionOpen) {
+      activeOptionRef.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex, mentionOpen]);
 
   const draftSegments = useMemo(
     () => parseCommentDraftSegments(value, mentionUsers, cursorPosition),
@@ -209,6 +228,9 @@ const CommentMentionInput = ({
           value={value}
           rows={minRows}
           placeholder=""
+          aria-activedescendant={
+            mentionOpen && activeMentionUser ? mentionOptionId(activeMentionUser.id) : undefined
+          }
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onChange={(event) => {
@@ -231,14 +253,22 @@ const CommentMentionInput = ({
           onScroll={syncScroll}
           onKeyDown={(event) => {
             if (mentionOpen && filteredMentionUsers.length > 0) {
+              // Only while the list is open, so the arrows keep moving the caret in a multi-line draft.
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                const step = event.key === 'ArrowDown' ? 1 : -1;
+                const count = filteredMentionUsers.length;
+                setActiveIndex((current) => (current + step + count) % count);
+                return;
+              }
               if (event.key === 'Tab') {
                 event.preventDefault();
-                insertMention(filteredMentionUsers[0].username);
+                insertMention(activeMentionUser.username);
                 return;
               }
               if (event.key === 'Enter' && !event.shiftKey && getMentionQuery(value, cursorPosition) != null) {
                 event.preventDefault();
-                insertMention(filteredMentionUsers[0].username);
+                insertMention(activeMentionUser.username);
                 return;
               }
             }
@@ -262,7 +292,7 @@ const CommentMentionInput = ({
             resize: 'none',
             bgcolor: 'transparent',
             color: 'transparent',
-            caretColor: 'text.primary',
+            caretColor: (theme) => theme.palette.text.primary,
             fontFamily: 'inherit',
             fontSize: INPUT_FONT_SIZE,
             lineHeight: INPUT_LINE_HEIGHT,
@@ -288,10 +318,16 @@ const CommentMentionInput = ({
               {mentionUsers.length === 0 ? 'No users available' : 'No matching users'}
             </Typography>
           ) : (
-            <List dense disablePadding>
-              {filteredMentionUsers.map((user) => (
+            <List dense disablePadding role="listbox">
+              {filteredMentionUsers.map((user, index) => (
                 <ListItemButton
                   key={user.id}
+                  id={mentionOptionId(user.id)}
+                  ref={index === activeIndex ? activeOptionRef : undefined}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  selected={index === activeIndex}
+                  onMouseEnter={() => setActiveIndex(index)}
                   onMouseDown={(event) => {
                     event.preventDefault();
                     insertMention(user.username);
