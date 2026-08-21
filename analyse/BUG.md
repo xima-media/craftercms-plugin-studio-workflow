@@ -223,7 +223,7 @@ Section im Dialog gegenprüfen.
 
 ## BUG-009
 
-- [ ] Kein Cursor im Kommentar-Eingabefeld sichtbar
+- [x] Kein Cursor im Kommentar-Eingabefeld sichtbar
 
 Das Eingabefeld ist eine transparente `textarea` über einer Spiegel-Box, die den Text mit
 hervorgehobenen Mentions rendert (`CommentMentionInput.tsx:160-250`). Der Text der `textarea` ist
