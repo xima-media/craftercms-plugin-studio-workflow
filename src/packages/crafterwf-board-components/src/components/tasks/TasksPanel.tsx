@@ -63,6 +63,14 @@ function dateTimeInputToApiValue(value: string | null | undefined): string | nul
   return trimmed;
 }
 
+// Viewport breakpoints never fire inside the narrow ICE panel, so the fields wrap on container width instead.
+const taskFieldRowSx = {
+  display: 'grid',
+  // min() caps the track floor at the container width, otherwise the fields overflow the narrowest panel.
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))',
+  gap: 1
+} as const;
+
 const TasksPanel = () => {
   const siteId = useActiveSiteId();
   const dispatch = useDispatch();
@@ -408,13 +416,7 @@ const TasksPanel = () => {
             disabled={creating}
           />
 
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-              gap: 1
-            }}
-          >
+          <Box sx={taskFieldRowSx}>
             <FormControl size="small" fullWidth>
               <InputLabel id="task-priority-label">Priority</InputLabel>
               <Select
@@ -452,7 +454,7 @@ const TasksPanel = () => {
             </FormControl>
           </Box>
 
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Box sx={taskFieldRowSx}>
             <TextField
               size="small"
               type="datetime-local"
@@ -471,7 +473,7 @@ const TasksPanel = () => {
               value={newDueOn}
               onChange={(e) => setNewDueOn(e.target.value)}
             />
-          </Stack>
+          </Box>
           <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
             <IconButton
               aria-label="Create task"
@@ -758,14 +760,7 @@ const TasksPanel = () => {
                       )}
                     </Stack>
 
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                        gap: 1,
-                        mb: 0.75
-                      }}
-                    >
+                    <Box sx={{ ...taskFieldRowSx, mb: 0.75 }}>
                       <FormControl size="small" fullWidth>
                         <InputLabel id={`task-${task.id}-priority-label`}>Priority</InputLabel>
                         <Select
