@@ -1,8 +1,9 @@
 import * as React from 'react';
-import { useEffect, useState, SyntheticEvent } from 'react';
+import { useCallback, useEffect, useState, SyntheticEvent } from 'react';
 
 import { Box, Tab, Tabs, Typography } from '@mui/material';
 
+import { ApiResponse, ApiResponseErrorState } from '@craftercms/studio-ui';
 import useActiveSiteId from '@craftercms/studio-ui/hooks/useActiveSiteId';
 import { getSchemaStatus } from '../../api/adminApi';
 import GeneralTab from './GeneralTab';
@@ -26,25 +27,41 @@ function ProjectToolsConfigurationPanel() {
   const siteId = useActiveSiteId();
   const [tab, setTab] = useState<ProjectToolsTab>('workflows');
   const [schemaReady, setSchemaReady] = useState(false);
+  const [error, setError] = useState<ApiResponse>();
 
   useEffect(() => {
     if (!siteId) {
       return;
     }
-    getSchemaStatus(siteId).subscribe({
+    setError(undefined);
+    const sub = getSchemaStatus(siteId).subscribe({
       next: (response) => {
         const installed = !!response.response.result?.installed;
         setSchemaReady(installed);
         if (!installed) {
           setTab('admin');
         }
+      },
+      error(e) {
+        console.error(e);
+        setError(
+          e.response?.response ??
+            ({ code: '?', message: 'Failed to read the workflow database status.' } as ApiResponse)
+        );
       }
     });
+
+    return () => sub.unsubscribe();
   }, [siteId]);
 
   const handleTabChange = (_: SyntheticEvent, value: ProjectToolsTab) => {
     setTab(value);
   };
+
+  // The admin tab stays put once the schema is ready; it is the place for administration to grow.
+  const handleSchemaReady = useCallback(() => {
+    setSchemaReady(true);
+  }, []);
 
   return (
     <Box
@@ -68,14 +85,12 @@ function ProjectToolsConfigurationPanel() {
       </Box>
 
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        {tab === 'admin' && (
-          <GeneralTab
-            onSchemaReady={() => {
-              setSchemaReady(true);
-              setTab('workflows');
-            }}
-          />
+        {error && (
+          <Box sx={{ px: 2, pt: 2 }}>
+            <ApiResponseErrorState error={error} />
+          </Box>
         )}
+        {tab === 'admin' && <GeneralTab onSchemaReady={handleSchemaReady} />}
         {tab === 'workflows' && <WorkflowsTab schemaReady={schemaReady} />}
         {tab === 'audit' && <AuditLogTab schemaReady={schemaReady} />}
       </Box>
