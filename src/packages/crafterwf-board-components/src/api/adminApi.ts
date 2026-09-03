@@ -103,9 +103,8 @@ export interface WorkflowDetail {
     id: string;
     name: string;
     description?: string;
+    /** Board canvas swatch id, or an http(s) URL for a background image. */
     backgroundUrl?: string;
-    /** Board canvas swatch id (stored in background_url) */
-    backgroundColor?: string;
     position?: number;
     isDefault?: boolean;
     createListeners?: WorkflowEventListener[];

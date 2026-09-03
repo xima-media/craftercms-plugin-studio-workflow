@@ -174,9 +174,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
       setDescription(detail.workflow.description || '');
       setBypassWarningMessage(detail.workflow.bypassWarningMessage || '');
       setAllowUiBypass(detail.workflow.allowUiBypass === true);
-      setBoardBackground(
-        normalizeBoardBackgroundId(detail.workflow.backgroundColor || detail.workflow.backgroundUrl)
-      );
+      setBoardBackground(normalizeBoardBackgroundId(detail.workflow.backgroundUrl));
       const mappedSteps = mapDetailSteps(detail.steps || []);
       setSteps(mappedSteps);
       const loadedLayout = mapFlowLayoutToClientKeys(detail.workflow.flowLayout, mappedSteps);
@@ -359,7 +357,7 @@ const WorkflowEditorDialog = ({ open, detail, onClose, onSaved }: WorkflowEditor
         ...detail.workflow,
         name: name.trim(),
         description: description.trim(),
-        backgroundColor: boardBackground,
+        backgroundUrl: boardBackground,
         bypassWarningMessage: bypassWarningMessage.trim(),
         allowUiBypass,
         flowLayout: mapFlowLayoutToStepIds(flowLayout, steps),

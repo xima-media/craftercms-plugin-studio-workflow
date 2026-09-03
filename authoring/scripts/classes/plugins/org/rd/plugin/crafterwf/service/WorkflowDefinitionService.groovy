@@ -212,8 +212,7 @@ class WorkflowDefinitionService {
             id              : workflowId,
             name            : workflowFields?.name?.toString()?.trim() ?: existing.name,
             description     : workflowFields?.description?.toString() ?: existing.description ?: '',
-            backgroundUrl   : (workflowFields?.backgroundUrl ?: workflowFields?.backgroundColor)?.toString() ?:
-                existing.backgroundUrl,
+            backgroundUrl   : workflowFields?.backgroundUrl?.toString() ?: existing.backgroundUrl,
             position        : existing.position != null ? existing.position : 0,
             isDefault       : workflowFields?.isDefault != null ? workflowFields.isDefault == true : existing.isDefault == true,
             steps           : normalizedSteps,

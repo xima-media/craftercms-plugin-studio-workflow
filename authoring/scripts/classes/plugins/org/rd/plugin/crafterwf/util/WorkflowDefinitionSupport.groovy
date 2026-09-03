@@ -33,7 +33,6 @@ class WorkflowDefinitionSupport {
             name            : definition.name,
             description     : definition.description ?: '',
             backgroundUrl   : definition.backgroundUrl,
-            backgroundColor : definition.backgroundColor ?: definition.backgroundUrl,
             position        : definition.position != null ? definition.position : 0,
             isDefault       : definition.isDefault == true,
             createListeners       : EventListenerJson.toListenerDtos(definition.createListeners),

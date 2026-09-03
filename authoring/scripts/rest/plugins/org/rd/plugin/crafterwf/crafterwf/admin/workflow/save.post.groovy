@@ -17,7 +17,7 @@ def userId = WorkflowContext.resolveUserId(applicationContext)
 def workflowFields = body.workflow ?: [
     name         : body.name,
     description  : body.description,
-    backgroundUrl: body.backgroundUrl ?: body.backgroundColor
+    backgroundUrl: body.backgroundUrl
 ]
 def steps = body.steps
 if (!(steps instanceof List)) {
