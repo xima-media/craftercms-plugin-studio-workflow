@@ -19,7 +19,7 @@ richtig funktioniert, aber besser werden soll.
 
 ## BUG-001
 
-- [ ] Admin-Tab der Projektwerkzeuge ist bei installiertem Schema nicht erreichbar
+- [x] Admin-Tab der Projektwerkzeuge ist bei installiertem Schema nicht erreichbar
 
 `GeneralTab` meldet `onSchemaReady()` bei **jedem** Mount, sobald die Statusabfrage `installed`
 liefert (`GeneralTab.tsx:32`). `ProjectToolsConfiguration` schaltet in diesem Callback auf den Tab
