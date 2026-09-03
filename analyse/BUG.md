@@ -79,7 +79,7 @@ Posten, weil das Rennen nur durch Wiederholung oder künstliche Verzögerung zuv
 
 ## BUG-003
 
-- [ ] Board background lässt sich nur einmal setzen, danach werden Änderungen verworfen
+- [x] Board background lässt sich nur einmal setzen, danach werden Änderungen verworfen
 
 Das Feld läuft unter zwei Namen durch die API. `toWorkflowDto`
 (`WorkflowDefinitionSupport.groovy:35-36`) liefert `backgroundUrl` und `backgroundColor` mit
