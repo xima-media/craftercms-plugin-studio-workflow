@@ -379,7 +379,7 @@ const TasksPanel = () => {
       )}
 
       {listInitialLoading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2, pb: 4 }}>
           <CircularProgress size={28} />
         </Box>
       )}

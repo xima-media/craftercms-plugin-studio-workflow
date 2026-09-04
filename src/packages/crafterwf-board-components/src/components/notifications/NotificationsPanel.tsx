@@ -162,6 +162,8 @@ const NotificationsPanel = () => {
     });
   };
 
+  const listInitialLoading = loading && notifications.length === 0;
+
   return (
     <Stack spacing={1.25} sx={{ p: 2, minWidth: 0 }}>
       <Box
@@ -250,9 +252,10 @@ const NotificationsPanel = () => {
         )}
       </Box>
 
-      {loading && notifications.length === 0 ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-          <CircularProgress size={24} />
+      {/* 22px on purpose: the 10px stack gap above completes the 32px the spinner has below */}
+      {listInitialLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2.75, pb: 4 }}>
+          <CircularProgress size={28} />
         </Box>
       ) : error ? (
         <Typography variant="body2" color="error">
@@ -367,13 +370,15 @@ const NotificationsPanel = () => {
         </Stack>
       )}
 
-      <Button
-        size="small"
-        sx={{ alignSelf: 'flex-start', px: 0, minWidth: 0 }}
-        onClick={() => setShowArchived((prev) => !prev)}
-      >
-        {showArchived ? 'Hide archived' : 'Show archived'}
-      </Button>
+      {!listInitialLoading && !error && (
+        <Button
+          size="small"
+          sx={{ alignSelf: 'flex-start', px: 0, minWidth: 0 }}
+          onClick={() => setShowArchived((prev) => !prev)}
+        >
+          {showArchived ? 'Hide archived' : 'Show archived'}
+        </Button>
+      )}
     </Stack>
   );
 };

@@ -172,120 +172,108 @@ const ContentCommentsPanel = () => {
     setShowArchived(show);
   };
 
-  if (!contentPath) {
-    return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          Open a content item in preview to see comments.
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-        <CircularProgress size={28} />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="body2" color="error">
-          {error}
-        </Typography>
-      </Box>
-    );
-  }
-
   const hasPackageComments = packages.length > 0;
 
   return (
     <Stack spacing={1.5} sx={{ p: 2, minWidth: 0 }}>
-      <Stack spacing={0.75}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase' }}>
-          Page comments
+      {!contentPath ? (
+        <Typography variant="body2" color="text.secondary">
+          Open a content item in preview to see comments.
         </Typography>
-        <CommentsSection
-          compact
-          comments={contentComments}
-          onAddComment={handleAddContentComment}
-          onResolveComment={handleResolveComment}
-          onArchiveComment={handleArchiveComment}
-          showArchived={showArchived}
-          onShowArchivedChange={handleShowArchivedChange}
-        />
-      </Stack>
-
-      {hasPackageComments && (
+      ) : loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2, pb: 4 }}>
+          <CircularProgress size={28} />
+        </Box>
+      ) : error ? (
+        <Typography variant="body2" color="error">
+          {error}
+        </Typography>
+      ) : (
         <>
-          <Divider flexItem />
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase' }}>
-            Workflow cards
-          </Typography>
-          {packages.map((pkg) => {
-            const open = expandedId === pkg.workflowPackageId;
-            const commentCount = pkg.comments?.length ?? 0;
-            const dotColor = coverColorDot(pkg.coverColor);
+          <Stack spacing={0.75}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase' }}>
+              Page comments
+            </Typography>
+            <CommentsSection
+              compact
+              comments={contentComments}
+              onAddComment={handleAddContentComment}
+              onResolveComment={handleResolveComment}
+              onArchiveComment={handleArchiveComment}
+              showArchived={showArchived}
+              onShowArchivedChange={handleShowArchivedChange}
+            />
+          </Stack>
 
-            return (
-              <Accordion
-                key={pkg.workflowPackageId}
-                expanded={open}
-                onChange={(_event, isExpanded) => setExpandedId(isExpanded ? pkg.workflowPackageId : false)}
-                disableGutters
-                sx={{
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: '8px !important',
-                  '&:before': { display: 'none' },
-                  overflow: 'hidden'
-                }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />} sx={{ minHeight: 48, '& .MuiAccordionSummary-content': { my: 0.75 } }}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0, pr: 0.5 }}>
-                    {dotColor && (
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          bgcolor: dotColor,
-                          flexShrink: 0
-                        }}
+          {hasPackageComments && (
+            <>
+              <Divider flexItem />
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase' }}>
+                Workflow cards
+              </Typography>
+              {packages.map((pkg) => {
+                const open = expandedId === pkg.workflowPackageId;
+                const commentCount = pkg.comments?.length ?? 0;
+                const dotColor = coverColorDot(pkg.coverColor);
+
+                return (
+                  <Accordion
+                    key={pkg.workflowPackageId}
+                    expanded={open}
+                    onChange={(_event, isExpanded) => setExpandedId(isExpanded ? pkg.workflowPackageId : false)}
+                    disableGutters
+                    sx={{
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: '8px !important',
+                      '&:before': { display: 'none' },
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />} sx={{ minHeight: 48, '& .MuiAccordionSummary-content': { my: 0.75 } }}>
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0, pr: 0.5 }}>
+                        {dotColor && (
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              bgcolor: dotColor,
+                              flexShrink: 0
+                            }}
+                          />
+                        )}
+                        <Stack spacing={0.15} sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography variant="body2" fontWeight={600} noWrap>
+                            {pkg.title}
+                          </Typography>
+                          {pkg.workflowStepName && (
+                            <Typography variant="caption" color="text.secondary" noWrap>
+                              {pkg.workflowStepName}
+                            </Typography>
+                          )}
+                        </Stack>
+                        <Chip label={commentCount} size="small" variant="outlined" sx={{ height: 22, flexShrink: 0 }} />
+                      </Stack>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ pt: 0, px: 1.5, pb: 1.5 }}>
+                      <CommentsSection
+                        compact
+                        comments={pkg.comments ?? []}
+                        onAddComment={(body, mentionedUserIds) =>
+                          handleAddPackageComment(pkg.workflowPackageId, body, mentionedUserIds)
+                        }
+                        onResolveComment={handleResolveComment}
+                        onArchiveComment={handleArchiveComment}
+                        showArchived={showArchived}
+                        onShowArchivedChange={handleShowArchivedChange}
                       />
-                    )}
-                    <Stack spacing={0.15} sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="body2" fontWeight={600} noWrap>
-                        {pkg.title}
-                      </Typography>
-                      {pkg.workflowStepName && (
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                          {pkg.workflowStepName}
-                        </Typography>
-                      )}
-                    </Stack>
-                    <Chip label={commentCount} size="small" variant="outlined" sx={{ height: 22, flexShrink: 0 }} />
-                  </Stack>
-                </AccordionSummary>
-                <AccordionDetails sx={{ pt: 0, px: 1.5, pb: 1.5 }}>
-                  <CommentsSection
-                    compact
-                    comments={pkg.comments ?? []}
-                    onAddComment={(body, mentionedUserIds) =>
-                      handleAddPackageComment(pkg.workflowPackageId, body, mentionedUserIds)
-                    }
-                    onResolveComment={handleResolveComment}
-                    onArchiveComment={handleArchiveComment}
-                    showArchived={showArchived}
-                    onShowArchivedChange={handleShowArchivedChange}
-                  />
-                </AccordionDetails>
-              </Accordion>
-            );
-          })}
+                    </AccordionDetails>
+                  </Accordion>
+                );
+              })}
+            </>
+          )}
         </>
       )}
     </Stack>
