@@ -230,7 +230,7 @@ const ContentCommentsPanel = () => {
                       overflow: 'hidden'
                     }}
                   >
-                    <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />} sx={{ minHeight: 48, '& .MuiAccordionSummary-content': { my: 0.75 } }}>
+                    <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />} sx={{ minHeight: 48, px: 1.25, '& .MuiAccordionSummary-content': { my: 0.75 } }}>
                       <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0, pr: 0.5 }}>
                         {dotColor && (
                           <Box
@@ -256,7 +256,7 @@ const ContentCommentsPanel = () => {
                         <Chip label={commentCount} size="small" variant="outlined" sx={{ height: 22, flexShrink: 0 }} />
                       </Stack>
                     </AccordionSummary>
-                    <AccordionDetails sx={{ pt: 0, px: 1.5, pb: 1.5 }}>
+                    <AccordionDetails sx={{ pt: 0, px: 1.25, pb: 1.25 }}>
                       <CommentsSection
                         compact
                         comments={pkg.comments ?? []}

@@ -393,8 +393,7 @@ const TasksPanel = () => {
       {!listInitialLoading && !error && showAddForm && (
       <Box
         sx={{
-          px: 1,
-          py: 1.25,
+          p: 1.25,
           borderRadius: 1,
           bgcolor: 'action.hover',
           minWidth: 0

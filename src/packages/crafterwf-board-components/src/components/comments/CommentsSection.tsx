@@ -105,7 +105,7 @@ const CommentsSection = ({
             <Box
               key={comment.id}
               sx={{
-                p: 1,
+                p: 1.25,
                 borderRadius: 1,
                 bgcolor: comment.archived
                   ? 'action.disabledBackground'

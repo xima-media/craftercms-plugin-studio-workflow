@@ -276,7 +276,7 @@ const NotificationsPanel = () => {
               <Box
                 key={notification.id}
                 sx={{
-                  p: 1,
+                  p: 1.25,
                   borderRadius: 1,
                   bgcolor: notification.archived ? 'action.disabledBackground' : 'action.hover',
                   opacity: notification.archived ? 0.85 : 1,
