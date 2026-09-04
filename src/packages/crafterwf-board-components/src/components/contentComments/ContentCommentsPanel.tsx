@@ -203,13 +203,9 @@ const ContentCommentsPanel = () => {
   const hasPackageComments = packages.length > 0;
 
   return (
-    <Stack spacing={1.5} sx={{ px: 1, pb: 2, minWidth: 0 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ px: 0.5, wordBreak: 'break-all' }}>
-        {contentPath}
-      </Typography>
-
+    <Stack spacing={1.5} sx={{ p: 2, minWidth: 0 }}>
       <Stack spacing={0.75}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase', px: 0.5 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase' }}>
           Page comments
         </Typography>
         <CommentsSection
@@ -226,7 +222,7 @@ const ContentCommentsPanel = () => {
       {hasPackageComments && (
         <>
           <Divider flexItem />
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase', px: 0.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase' }}>
             Workflow cards
           </Typography>
           {packages.map((pkg) => {

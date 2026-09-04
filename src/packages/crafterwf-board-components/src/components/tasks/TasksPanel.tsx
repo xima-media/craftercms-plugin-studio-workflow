@@ -346,31 +346,37 @@ const TasksPanel = () => {
   const listInitialLoading =
     (loading && tasks.length === 0) || (assigneesLoading && assigneeOptions.length === 0);
 
+  const showSortControl = !listInitialLoading && !error && tasks.length > 0;
+  const showActionRow = !listInitialLoading && !error && (!showAddForm || showSortControl);
+
   return (
-    <Stack spacing={1.5} sx={{ px: 1, pb: 2, minWidth: 0, width: '100%', height: '100%', minHeight: 0 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ px: 0.5, flexShrink: 0 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase' }}
-        >
-          Tasks
-        </Typography>
-        {!listInitialLoading && !error && tasks.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel id="tasks-sort-label">Sort by</InputLabel>
-            <Select
-              labelId="tasks-sort-label"
-              label="Sort by"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as TaskSortMode)}
-            >
-              <MenuItem value="due">Due date</MenuItem>
-              <MenuItem value="priority">Priority</MenuItem>
-            </Select>
-          </FormControl>
-        )}
-      </Stack>
+    <Stack spacing={1.5} sx={{ p: 2, minWidth: 0, width: '100%', height: '100%', minHeight: 0 }}>
+      {showActionRow && (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ flexShrink: 0 }}>
+          {/* Placeholder keeps the sort control on the right edge while the add form replaces the button */}
+          {showAddForm ? (
+            <Box />
+          ) : (
+            <Button size="small" sx={{ px: 0, minWidth: 0 }} onClick={() => setShowAddForm(true)}>
+              Add task
+            </Button>
+          )}
+          {showSortControl && (
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel id="tasks-sort-label">Sort by</InputLabel>
+              <Select
+                labelId="tasks-sort-label"
+                label="Sort by"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as TaskSortMode)}
+              >
+                <MenuItem value="due">Due date</MenuItem>
+                <MenuItem value="priority">Priority</MenuItem>
+              </Select>
+            </FormControl>
+          )}
+        </Stack>
+      )}
 
       {listInitialLoading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -379,19 +385,9 @@ const TasksPanel = () => {
       )}
 
       {!listInitialLoading && error && (
-        <Typography variant="body2" color="error" sx={{ px: 0.5 }}>
+        <Typography variant="body2" color="error">
           {error}
         </Typography>
-      )}
-
-      {!listInitialLoading && !error && !showAddForm && (
-        <Button
-          size="small"
-          sx={{ alignSelf: 'flex-start', px: 0.5, minWidth: 0 }}
-          onClick={() => setShowAddForm(true)}
-        >
-          Add task
-        </Button>
       )}
 
       {!listInitialLoading && !error && showAddForm && (
@@ -504,7 +500,7 @@ const TasksPanel = () => {
 
       {!listInitialLoading && !error && (
         tasks.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
           No tasks.
         </Typography>
       ) : (
@@ -528,7 +524,7 @@ const TasksPanel = () => {
                 : groupUser.label;
             return (
               <Stack key={group.assigneeId} spacing={0.75}>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.25 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
                   <UserAvatarLabel user={groupUser} label={groupTitle} size={28} typographyVariant="subtitle2" fontWeight={600} />
                   <Chip label={group.tasks.length} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                 </Stack>
@@ -858,7 +854,7 @@ const TasksPanel = () => {
       {!listInitialLoading && !error && (
         <Button
           size="small"
-          sx={{ alignSelf: 'flex-start', px: 0.5, minWidth: 0 }}
+          sx={{ alignSelf: 'flex-start', px: 0, minWidth: 0 }}
           onClick={() => setShowArchived((prev) => !prev)}
         >
           {showArchived ? 'Hide archived' : 'Show archived'}

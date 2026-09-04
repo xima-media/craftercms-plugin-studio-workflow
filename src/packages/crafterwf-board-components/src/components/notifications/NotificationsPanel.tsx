@@ -163,11 +163,7 @@ const NotificationsPanel = () => {
   };
 
   return (
-    <Stack spacing={1.25} sx={{ px: 1, pb: 2, minWidth: 0 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.06, textTransform: 'uppercase', px: 0.5 }}>
-        Notifications
-      </Typography>
-
+    <Stack spacing={1.25} sx={{ p: 2, minWidth: 0 }}>
       <Box
         sx={{
           p: 1.25,
@@ -259,11 +255,11 @@ const NotificationsPanel = () => {
           <CircularProgress size={24} />
         </Box>
       ) : error ? (
-        <Typography variant="body2" color="error" sx={{ px: 0.5 }}>
+        <Typography variant="body2" color="error">
           {error}
         </Typography>
       ) : notifications.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
           No notifications.
         </Typography>
       ) : (
