@@ -170,7 +170,7 @@ alle drei Panels inklusive Wechsel und Zurück 0,5 bis 1,5 h.
 
 ## BUG-006
 
-- [ ] Datumsfelder im Tasks-Panel schneiden die Uhrzeit ab
+- [x] Datumsfelder im Tasks-Panel schneiden die Uhrzeit ab
 
 "Start date & time" und "Due date & time" stehen im Formular "Add task" nebeneinander in einer Zeile
 (`TasksPanel.tsx:455-474`, `Stack direction="row"` mit zwei `fullWidth`-Feldern). Jedes Feld bekommt
