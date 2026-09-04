@@ -165,7 +165,7 @@ const NotificationsPanel = () => {
   const listInitialLoading = loading && notifications.length === 0;
 
   return (
-    <Stack spacing={1.25} sx={{ p: 2, minWidth: 0 }}>
+    <Stack spacing={1.5} sx={{ p: 2, minWidth: 0 }}>
       <Box
         sx={{
           p: 1.25,
@@ -252,9 +252,9 @@ const NotificationsPanel = () => {
         )}
       </Box>
 
-      {/* 22px on purpose: the 10px stack gap above completes the 32px the spinner has below */}
+      {/* 20px on purpose: the 12px stack gap above completes the 32px the spinner has below */}
       {listInitialLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2.75, pb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2.5, pb: 4 }}>
           <CircularProgress size={28} />
         </Box>
       ) : error ? (
